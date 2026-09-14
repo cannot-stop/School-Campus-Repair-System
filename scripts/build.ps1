@@ -1,15 +1,19 @@
 ﻿# =============================================================================
-#  校园报修系统 · 构建脚本（仅依赖 JDK，无需 Maven 与外网）
+#  校园报修系统 · 编译校验与业务自测脚本（仅依赖 JDK，无需 Maven 与外网）
+#
+#  说明：本项目的运行方式是「IDEA + Tomcat 部署」，Tomcat 会自行编译/部署 Web 应用，
+#        因此本脚本不启动服务，只做两件事：
+#          1) 用 javac 编译全部 Java 源码，尽早发现编译错误；
+#          2) 可选地运行业务自测（99 项断言），验证 Service/DAO 层业务规则。
+#
 #  用法：
-#     pwsh -File scripts\build.ps1                编译主程序
-#     pwsh -File scripts\build.ps1 -Clean         先清理再编译
-#     pwsh -File scripts\build.ps1 -WithSelfTest  编译并执行自测
-#     pwsh -File scripts\build.ps1 -Run           编译后启动服务
+#     pwsh -File scripts\build.ps1                编译主程序（含 Servlet 适配层需要 Tomcat 的 jar）
+#     pwsh -File scripts\build.ps1 -Clean         先清理 build 目录再编译
+#     pwsh -File scripts\build.ps1 -WithSelfTest  编译并执行业务自测（99 项断言）
 # =============================================================================
 param(
     [switch]$Clean,
-    [switch]$WithSelfTest,
-    [switch]$Run
+    [switch]$WithSelfTest
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,6 +24,7 @@ $buildDir = Join-Path $root "build"
 $classesDir = Join-Path $buildDir "classes"
 $testClassesDir = Join-Path $buildDir "test-classes"
 $sourceDir = Join-Path $root "src\main\java"
+$servletAdapterDir = Join-Path $root "src\servlet-adapter\java"
 $testSourceDir = Join-Path $root "src\test\java"
 
 # ---------------------------------------------------------------- 定位 JDK
@@ -53,21 +58,49 @@ if ($Clean -and (Test-Path $buildDir)) {
     Write-Host "[构建] 已清理 build 目录" -ForegroundColor Cyan
 }
 
+# ------------------------------------------------- 定位 Tomcat（编译 Servlet 适配层需要其 jar）
+function Resolve-TomcatHome {
+    foreach ($candidate in @($env:CATALINA_HOME, $env:TOMCAT_HOME, "C:\Program Files (x86)\Java\apache-tomcat-11.0.18")) {
+        if ($candidate -and (Test-Path (Join-Path $candidate "lib\servlet-api.jar"))) { return $candidate }
+    }
+    return $null
+}
+
+$tomcatHome = Resolve-TomcatHome
+$compileClassPath = ""
+if ($tomcatHome) {
+    $compileClassPath = (Join-Path $tomcatHome "lib\servlet-api.jar") + ";" + (Join-Path $tomcatHome "lib\jsp-api.jar")
+    Write-Host "[构建] Tomcat: $tomcatHome（已加入 servlet-api/jsp-api，用于编译 Servlet 适配层）" -ForegroundColor Cyan
+} else {
+    Write-Host "[构建] 未找到 Tomcat（可用 CATALINA_HOME 指定）；本次仅编译主程序，跳过 Servlet 适配层" -ForegroundColor Yellow
+}
+
 New-Item -ItemType Directory -Force -Path $classesDir | Out-Null
 
 # ------------------------------------------------- 收集源码（相对路径，规避空格）
 Push-Location $root
 try {
-    $sources = Get-ChildItem -Path $sourceDir -Recurse -Filter *.java |
-        ForEach-Object { $_.FullName.Substring($root.Length + 1).Replace('\', '/') }
+    $sourceDirs = @($sourceDir)
+    if ($tomcatHome -and (Test-Path $servletAdapterDir)) {
+        $sourceDirs += $servletAdapterDir
+    }
+    $sources = @()
+    foreach ($dir in $sourceDirs) {
+        $sources += Get-ChildItem -Path $dir -Recurse -Filter *.java |
+            ForEach-Object { $_.FullName.Substring($root.Length + 1).Replace('\', '/') }
+    }
     if ($sources.Count -eq 0) { throw "未找到任何 Java 源文件：$sourceDir" }
     $argFile = Join-Path $buildDir "sources.txt"
     [System.IO.File]::WriteAllLines($argFile, $sources, (New-Object System.Text.UTF8Encoding($false)))
 
     Write-Host "[构建] 编译 $($sources.Count) 个源文件 ..." -ForegroundColor Cyan
-    & $javac -encoding UTF-8 -d "build/classes" -Xlint:-options "@build/sources.txt"
+    if ($compileClassPath) {
+        & $javac -encoding UTF-8 -cp $compileClassPath -d "build/classes" -Xlint:-options "@build/sources.txt"
+    } else {
+        & $javac -encoding UTF-8 -d "build/classes" -Xlint:-options "@build/sources.txt"
+    }
     if ($LASTEXITCODE -ne 0) { throw "编译失败（javac 退出码 $LASTEXITCODE）" }
-    Write-Host "[构建] 主程序编译成功 → build\classes" -ForegroundColor Green
+    Write-Host "[构建] 编译成功 → build\classes" -ForegroundColor Green
 
     # 复制配置等资源到 classpath，使 -D 参数覆盖 config.properties 生效
     $resourceDir = Join-Path $root "src\main\resources"
@@ -93,15 +126,6 @@ try {
             $code = $LASTEXITCODE
             if ($code -ne 0) { throw "自测未通过（退出码 $code）" }
         }
-    }
-
-    if ($Run) {
-        Write-Host "[运行] 启动校园报修系统 ..." -ForegroundColor Cyan
-        # 若 lib 目录存在 MySQL 驱动则加入 classpath（jdbc 模式必需）
-        $cp = "build/classes"
-        $driver = Join-Path $root "lib\mysql-connector-j-8.3.0.jar"
-        if (Test-Path $driver) { $cp = $cp + ";lib/mysql-connector-j-8.3.0.jar" }
-        & $java $utf8Arg -cp $cp com.campus.repair.boot.CampusRepairApplication
     }
 }
 finally {

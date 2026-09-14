@@ -23,7 +23,7 @@
                     '<td><div class="row-actions">' +
                     '<button class="btn btn-sm btn-success act-accept" data-id="' + row.orderId + '">受理</button>' +
                     '<button class="btn btn-sm btn-danger act-reject" data-id="' + row.orderId + '">不受理</button>' +
-                    '<a class="btn btn-sm btn-ghost" href="/report-detail.html?orderId=' + row.orderId + '">详情</a>' +
+                    '<a class="btn btn-sm btn-ghost" href="report-detail.html?orderId=' + row.orderId + '">详情</a>' +
                     '</div></td>' +
                     '</tr>';
             }, 9);

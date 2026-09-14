@@ -29,7 +29,7 @@
             alertBox.className = 'alert alert-success';
             alertBox.innerHTML = '报修提交成功，报修单号 <b>#' + order.orderId + '</b>，' +
                 '当前状态：' + (App.ORDER_STATUS[order.status] || {}).text + '。' +
-                ' <a href="/report-detail.html?orderId=' + order.orderId + '">查看详情</a>';
+                ' <a href="report-detail.html?orderId=' + order.orderId + '">查看详情</a>';
             form.reset();
             loadPending();
         }).fail(function (res) {
@@ -45,7 +45,7 @@
             });
             App.renderRows('pendingBody', rows, function (row) {
                 return '<tr>' +
-                    '<td><a href="/report-detail.html?orderId=' + row.orderId + '">#' + row.orderId + '</a></td>' +
+                    '<td><a href="report-detail.html?orderId=' + row.orderId + '">#' + row.orderId + '</a></td>' +
                     '<td>' + App.escapeHtml(row.location) + '</td>' +
                     '<td>' + App.orderStatusTag(row.status) + '</td>' +
                     '<td>' + App.formatDate(row.createTime) + '</td>' +

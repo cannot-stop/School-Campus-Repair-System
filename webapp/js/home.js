@@ -76,7 +76,7 @@
                     '<td>' + (row.priority === 1 ? '<span class="tag tag-red">紧急</span>' : '<span class="tag tag-gray">普通</span>') + '</td>' +
                     '<td>' + App.taskStatusTag(row.status) + '</td>' +
                     '<td>' + App.formatDate(row.dispatchTime) + '</td>' +
-                    '<td><a class="btn btn-sm btn-primary" href="/task.html?taskId=' + row.taskId + '">处理</a></td>' +
+                    '<td><a class="btn btn-sm btn-primary" href="task.html?taskId=' + row.taskId + '">处理</a></td>' +
                     '</tr>';
             }, 8);
         });

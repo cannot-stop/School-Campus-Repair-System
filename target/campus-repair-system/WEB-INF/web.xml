@@ -2,10 +2,10 @@
 <!--
   校园报修系统 · Web 容器部署描述文件
   适用容器：Tomcat 10.x / Jetty 11+（Jakarta EE 9+，命名空间 jakarta.servlet）
+  部署方式：IDEA + Tomcat（Web 根 = 项目内 webapp 目录）
 
-  说明：系统默认使用 JDK 内置服务器运行（com.campus.repair.boot.CampusRepairApplication），
-        本文件用于将同一套 Controller/Service/DAO 部署到标准 Servlet 容器。
-        前端静态页面位于 webapp/ 目录，可直接作为 Web 根资源；JSP 视图位于 webapp/WEB-INF/jsp/。
+  运行入口：ApiServlet（映射 /api/*，参数适配与调度）+ CampusContextListener（启动初始化与自检）
+  前端静态页面位于 webapp/ 目录，JSP 视图位于 webapp/WEB-INF/jsp/。
 -->
 <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -87,8 +87,8 @@
     </jsp-config>
 
     <!-- ====================== JSP 视图目录保护 ======================
-         视图统一放在 WEB-INF/jsp 下，禁止直接访问；外部通过 /forward.jsp?view=xxx
-         或 *.jsp 入口转发加载（见 src/main/webapp/forward.jsp 白名单）。 -->
+         JSP 视图统一放在 WEB-INF/jsp 下，禁止通过 URL 直接访问，
+         如需在页面中使用，请在 Servlet 内部 RequestDispatcher 转发。 -->
     <security-constraint>
         <web-resource-collection>
             <web-resource-name>JSP 视图目录保护</web-resource-name>

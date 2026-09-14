@@ -24,9 +24,9 @@ import jakarta.servlet.http.HttpSession;
  * 前端控制器 Servlet（对应设计书 2.1"采用前端控制器与各功能控制器处理用户请求"）。
  *
  * <p>把容器的 {@link HttpServletRequest} 适配为系统内部的 {@link ParamMap}，
- * 复用同一套 Controller / Service / DAO，并保持与内置服务器完全一致的接口契约。</p>
+ * 复用同一套 Controller / Service / DAO，是本系统在 Tomcat 中的统一接口入口。</p>
  *
- * <p><b>编译说明</b>：依赖 Jakarta Servlet API 6.0，仅在 Tomcat 10+/Jetty 11+ 部署时需要编译。</p>
+ * <p><b>编译说明</b>：依赖 Jakarta Servlet API（Tomcat 10+/Jetty 11+），由容器编译与加载。</p>
  */
 @WebServlet(name = "apiServlet", urlPatterns = "/api/*")
 public class ApiServlet extends HttpServlet {

@@ -33,7 +33,7 @@
             showAlert('注册成功！账户已提交实名审核，审核通过后即可登录（用户名：' + result.username + '）', 'success');
             form.reset();
             skillRow.className = 'hidden';
-            setTimeout(function () { location.href = App.url('/index.html'); }, 2200);
+            setTimeout(function () { location.href = 'index.html'; }, 2200);
         }).fail(function (res) {
             showAlert(res.message || '注册失败');
         });

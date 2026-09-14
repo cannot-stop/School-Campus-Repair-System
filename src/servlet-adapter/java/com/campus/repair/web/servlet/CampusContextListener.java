@@ -17,7 +17,7 @@ import jakarta.servlet.ServletContextListener;
  * &gt; classpath 下 config.properties &gt; 内置默认值。</p>
  *
  * <p><b>编译说明</b>：本类依赖 Jakarta Servlet API（servlet-api.jar）与 JSP API，
- * 仅在部署到 Tomcat/Jetty 等容器时需要编译；使用内置服务器运行时无需本包。</p>
+ * 由 Tomcat 等容器编译与加载；本项目仅支持容器部署（IDEA + Tomcat）。</p>
  */
 public class CampusContextListener implements ServletContextListener {
 

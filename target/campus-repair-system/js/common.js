@@ -10,8 +10,8 @@ var App = (function () {
 
     /**
      * 应用上下文路径：兼容 Tomcat 部署在 /campus_repair_system_war 等非根上下文的情况。
-     * 推导顺序：容器注入的 window.__CRS_BASE__（init.jsp）→ 由 js/common.js 自身地址推导
-     * → 由页面地址推导。
+     * 推导顺序：页面内联注入的 window.__CRS_BASE__（可选，供特殊页面覆盖）
+     * → 由 js/common.js 自身地址推导 → 由页面地址推导。
      */
     var BASE = (function () {
         if (typeof window.__CRS_BASE__ === 'string') {
@@ -36,8 +36,13 @@ var App = (function () {
     })();
 
     /**
-     * 把应用内路径拼接为带上下文路径的地址。
-     * 非字符串参数原样返回，保证 App.url() 只作用于字符串（防御性设计）。
+     * 把「以 / 开头的应用内绝对路径」拼接为带上下文路径的地址。
+     *
+     * 设计约定：
+     *   - 接口调用（`App.api`）内部统一使用本方法，因此传参必须是 `/api/...` 形式；
+     *   - 页面跳转与静态资源请直接使用**相对路径**（如 `register.html`、`../css/style.css`），
+     *     页面顶部已注入 <base>，相对路径在任何上下文下都能正确解析；
+     *   - 为避免重复拼接（如 /ctx/ctx/xxx），若路径已经包含当前上下文前缀，则原样返回。
      */
     function url(path) {
         if (typeof path !== 'string') { return path; }
@@ -47,6 +52,9 @@ var App = (function () {
         }
         if (path.charAt(0) !== '/') {
             path = '/' + path;
+        }
+        if (BASE && (path === BASE || path.indexOf(BASE + '/') === 0)) {
+            return path;
         }
         return BASE + path;
     }
@@ -97,7 +105,7 @@ var App = (function () {
     function logout() {
         api('/api/account/logout', {}).always(function () {
             clearSession();
-            location.href = url('/index.html');
+            location.href = 'index.html';
         });
     }
 
@@ -125,7 +133,7 @@ var App = (function () {
             } else if (result && result.code === 1003) {
                 toast(result.message || '登录状态已失效', 'error');
                 clearSession();
-                setTimeout(function () { location.href = url('/index.html'); }, 800);
+                setTimeout(function () { location.href = 'index.html'; }, 800);
                 chain.fail.forEach(function (fn) { fn(result); });
             } else {
                 var message = (result && result.message) || '请求失败';
@@ -281,32 +289,33 @@ var App = (function () {
     }
 
     /* ------------------------------------------------------------ 页面外壳 */
+    // 导航链接使用相对路径：页面已注入 <base>，相对路径在任意上下文下都能正确解析
     var NAV = {
         reporter: [
-            { href: '/report.html', text: '我的报修', key: 'report' },
-            { href: '/report-submit.html', text: '提交报修', key: 'report-submit' },
-            { href: '/messages.html', text: '消息通知', key: 'messages' }
+            { href: 'report.html', text: '我的报修', key: 'report' },
+            { href: 'report-submit.html', text: '提交报修', key: 'report-submit' },
+            { href: 'messages.html', text: '消息通知', key: 'messages' }
         ],
         worker: [
-            { href: '/task.html', text: '我的维修任务', key: 'task' },
-            { href: '/material.html', text: '耗材库存', key: 'material' },
-            { href: '/messages.html', text: '消息通知', key: 'messages' }
+            { href: 'task.html', text: '我的维修任务', key: 'task' },
+            { href: 'material.html', text: '耗材库存', key: 'material' },
+            { href: 'messages.html', text: '消息通知', key: 'messages' }
         ],
         manager: [
-            { href: '/audit.html', text: '报修审核', key: 'audit' },
-            { href: '/dispatch.html', text: '派单管理', key: 'dispatch' },
-            { href: '/monitor.html', text: '维修监督', key: 'monitor' },
-            { href: '/statistics.html', text: '统计分析', key: 'statistics' },
-            { href: '/evaluation.html', text: '评价管理', key: 'evaluation' },
-            { href: '/material.html', text: '耗材管理', key: 'material' },
-            { href: '/messages.html', text: '消息通知', key: 'messages' }
+            { href: 'audit.html', text: '报修审核', key: 'audit' },
+            { href: 'dispatch.html', text: '派单管理', key: 'dispatch' },
+            { href: 'monitor.html', text: '维修监督', key: 'monitor' },
+            { href: 'statistics.html', text: '统计分析', key: 'statistics' },
+            { href: 'evaluation.html', text: '评价管理', key: 'evaluation' },
+            { href: 'material.html', text: '耗材管理', key: 'material' },
+            { href: 'messages.html', text: '消息通知', key: 'messages' }
         ],
         admin: [
-            { href: '/admin.html', text: '用户与审核', key: 'admin' },
-            { href: '/base-data.html', text: '基础数据', key: 'base-data' },
-            { href: '/statistics.html', text: '统计分析', key: 'statistics' },
-            { href: '/material.html', text: '耗材管理', key: 'material' },
-            { href: '/messages.html', text: '消息通知', key: 'messages' }
+            { href: 'admin.html', text: '用户与审核', key: 'admin' },
+            { href: 'base-data.html', text: '基础数据', key: 'base-data' },
+            { href: 'statistics.html', text: '统计分析', key: 'statistics' },
+            { href: 'material.html', text: '耗材管理', key: 'material' },
+            { href: 'messages.html', text: '消息通知', key: 'messages' }
         ]
     };
 
@@ -318,21 +327,21 @@ var App = (function () {
         var opts = options || {};
         var current = user();
         if (!current || !token()) {
-            location.href = url('/index.html');
+            location.href = 'index.html';
             return null;
         }
         var allowRoles = opts.roles || [];
         if (allowRoles.length && allowRoles.indexOf(current.role) < 0) {
             document.body.innerHTML = '<div class="content"><div class="alert alert-error">当前角色（' +
                 roleText(current.role) + '）无权访问该页面。</div>' +
-                '<a class="btn btn-primary" href="' + url('/home.html') + '">返回我的工作台</a></div>';
+                '<a class="btn btn-primary" href="home.html">返回我的工作台</a></div>';
             return null;
         }
         var items = NAV[current.role] || [];
-        var navHtml = '<a href="' + url('/home.html') + '"' + (opts.key === 'home' ? ' class="active"' : '') + '>我的工作台</a>';
+        var navHtml = '<a href="home.html"' + (opts.key === 'home' ? ' class="active"' : '') + '>我的工作台</a>';
         navHtml += items.map(function (item) {
             var active = (item.key === opts.key) ? ' class="active"' : '';
-            return '<a href="' + url(item.href) + '"' + active + '>' + item.text + '</a>';
+            return '<a href="' + item.href + '"' + active + '>' + item.text + '</a>';
         }).join('');
 
         var sidebar = document.getElementById('sidebar');

@@ -46,7 +46,7 @@
                     '<td>' + App.escapeHtml(row.workerName || '—') + '</td>' +
                     '<td>' + App.formatDate(row.dispatchTime) + '</td>' +
                     '<td>' + (row.urgeCount || 0) + '</td>' +
-                    '<td><a class="btn btn-sm btn-ghost" href="/report-detail.html?orderId=' + row.orderId + '">详情</a>' +
+                    '<td><a class="btn btn-sm btn-ghost" href="report-detail.html?orderId=' + row.orderId + '">详情</a>' +
                     (row.status === 4 ? '<button class="btn btn-sm btn-success act-pass" data-id="' + row.orderId + '">确认归档</button>' : '') +
                     '</td>' +
                     '</tr>';

@@ -54,7 +54,7 @@
             lastPages = data.pages || 1;
             document.getElementById('pageInfo').textContent = '第 ' + data.pageNum + ' / ' + lastPages + ' 页，共 ' + data.total + ' 条';
             App.renderRows('listBody', data.rows, function (row) {
-                var actions = '<a class="btn btn-sm btn-ghost" href="/report-detail.html?orderId=' + row.orderId + '">详情</a>';
+                var actions = '<a class="btn btn-sm btn-ghost" href="report-detail.html?orderId=' + row.orderId + '">详情</a>';
                 if (row.cancelable) {
                     actions += '<button class="btn btn-sm btn-ghost act-cancel" data-id="' + row.orderId + '">撤销</button>';
                 }

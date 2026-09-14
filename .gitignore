@@ -1,0 +1,22 @@
+# =============================================================================
+#  校园报修系统 · IntelLiJ IDEA 忽略项
+#  （部署方式：IDEA + Tomcat，本文件仅用于忽略编译产物与本地配置）
+# =============================================================================
+
+# 编译产物
+/build/
+/out/
+/target/
+
+# 日志
+*.log
+
+# IDEA 本地配置（保留 .iml 模块文件，团队共享 Web Facet 配置）
+.idea/workspace.xml
+.idea/usage.statistics.xml
+.idea/shelf/
+.idea/dictionaries/
+
+# 操作系统
+Thumbs.db
+.DS_Store

@@ -17,43 +17,45 @@
 
 ---
 
-## 一、快速启动
+## 一、快速启动（IDEA + Tomcat）
 
-### 1. 内存库模式（无需数据库，5 秒上手）
+本项目的运行方式为 **IDEA + Tomcat 10/11 部署**（Tomcat 会自行编译 Java 源码，无需 Maven）。
+
+### 1. 配置 Artifact 与 Tomcat（一次性，约 1 分钟）
+
+1. IDEA → `File → Project Structure → Artifacts`：新增 *Web Application: Exploded*（输出目录自定）：
+   - `Web resource directory` 指向模块内的 **`webapp`** 目录；
+   - `Available Elements` 中把 **模块的 compile output** 加入 `WEB-INF/classes`；
+   - 用 MySQL 时把 **`lib/mysql-connector-j-8.3.0.jar`** 加入 `WEB-INF/lib`。
+2. IDEA → `Run → Edit Configurations → Tomcat Server → Local`：
+   - `Deployment` 标签页 `+` 选择该 artifact；`Application context` 填 `/` 或任意名称（如 `/campus_repair_system_war`）；
+   - `Server` 标签页确认 JDK 为 17 及以上（本项目在 JDK 25 上验证）。
+3. 点 Run 启动，浏览器访问 `http://localhost:8080/`（或 `http://localhost:8080/<上下文>/`）。
+
+> 模块的 Web Facet（`campus-repair-system.iml`）已指向 `webapp` 与 `WEB-INF/web.xml`，
+> 通常 IDEA 会自动识别；若 Artifact 列表为空，按上面第 1 步手工添加即可。
+
+### 2. 数据源：内存库（默认，开箱可登录）或 MySQL
+
+默认 `webapp/WEB-INF/web.xml` 中 `storage.mode=memory`，内置与 `db/seed.sql` 一致的演示数据，
+**无需数据库即可登录**。切到 MySQL 持久化：
 
 ```bat
-build.cmd             :: 编译（自动定位 JDK，无需 Maven 与外网）
-run.cmd               :: 启动，默认 http://127.0.0.1:8080/
-```
-
-启动后浏览器打开 <http://127.0.0.1:8080/>，使用下方演示账号登录。
-内存库模式预置了与 `db/seed.sql` 一致的演示数据，可直接体验完整业务闭环。
-
-### 2. MySQL 持久化模式
-
-```bat
-:: ① 建库建表 + 导入演示数据（mysql 客户端）
+:: ① 建库建表 + 导入演示数据
 mysql -u root -p --default-character-set=utf8mb4 -e "source db/schema.sql"
 mysql -u root -p --default-character-set=utf8mb4 -e "source db/seed.sql"
 
-:: ② 把驱动放入 lib 目录（首次）
-copy "%USERPROFILE%\.m2\repository\com\mysql\mysql-connector-j\8.3.0\mysql-connector-j-8.3.0.jar" lib\
-
-:: ③ 以 jdbc 模式启动（示例密码 123456，按实际修改）
-run.cmd 8080 jdbc
+:: ② 改 webapp/WEB-INF/web.xml：storage.mode 改为 jdbc，并把 db.password 改成你的 MySQL 密码
+::    或（推荐）用环境变量传密码，避免明文入库：
+::    IDEA → Tomcat 运行配置 → Environment variables 增加 CAMPUS_DB_PASSWORD=你的密码
 ```
 
-也可直接修改 `src/main/resources/config.properties` 中 `storage.mode=jdbc` 与数据库连接信息，
-之后 `run.cmd` 即默认使用 MySQL。
-
-### 3. 构建与验证命令
+### 3. 编译校验与验证命令（可选，Tomcat 会自行编译）
 
 ```bat
-pwsh -File scripts\build.ps1                  :: 编译主程序 → build\classes
-pwsh -File scripts\build.ps1 -Clean           :: 清理后重新编译
-pwsh -File scripts\build.ps1 -WithSelfTest    :: 编译并执行业务自测（99 项断言）
-pwsh -File scripts\build.ps1 -Run             :: 编译并启动服务
-pwsh -File scripts\http-e2e.ps1 -Base http://127.0.0.1:8080   :: 端到端接口验证（97 项断言）
+build.cmd                                          :: 用 javac 编译全部源码（含 Servlet 适配层），提前发现编译错误
+build.cmd -WithSelfTest                            :: 编译并运行业务自测（99 项断言，报告 build/selftest.log）
+pwsh -File scripts\http-e2e.ps1 -Base http://127.0.0.1:8080/campus_repair_system_war   :: 端到端接口验证（97 项断言）
 ```
 
 ### 4. 演示账号
@@ -73,18 +75,18 @@ pwsh -File scripts\http-e2e.ps1 -Base http://127.0.0.1:8080   :: 端到端接口
 
 ```
 campus-repair-system/
-├─ build.cmd / run.cmd              一键构建与启动脚本
-├─ pom.xml                          可选：Maven 打包 WAR（Tomcat 10+ 部署，Web 根指向 webapp/）
+├─ build.cmd                        编译校验脚本入口（javac + 业务自测，无需 Maven 与外网）
 ├─ README.md / DELIVERY-VERIFICATION.md  交付说明与交付验证报告
+├─ .gitignore                       忽略编译产物与 IDEA 本地配置
+├─ campus-repair-system.iml         IDEA 模块文件（Web Facet 指向 webapp 与 web.xml）
 ├─ scripts/
-│   ├─ build.ps1                    构建脚本（javac + 资源复制，无第三方依赖）
+│   ├─ build.ps1                    编译校验与自测脚本（自动定位 JDK 与 Tomcat）
 │   └─ http-e2e.ps1                 端到端接口验证脚本（97 项断言）
 ├─ db/
 │   ├─ schema.sql                   建库建表脚本（10 张表 + 外键、唯一约束、索引）
 │   └─ seed.sql                     演示数据（8 账户、7 报修单、4 任务等）
-├─ lib/                             MySQL 驱动（jdbc 模式使用）
-├─ webapp/                          前端资源（内置服务器直接托管，也是 WAR 的 Web 根）
-│   ├─ init.jsp                     容器部署起始页（注入上下文路径 + 登录表单）
+├─ lib/                             MySQL 驱动（jdbc 模式，加入 WEB-INF/lib）
+└─ webapp/                          前端资源与 Web 配置（即 IDEA Artifact 的 Web 根）
 │   ├─ index.html register.html     登录 / 注册
 │   ├─ home.html                    工作台（按角色自适应）
 │   ├─ report*.html task.html       报修查询/提交/详情、维修任务处理
@@ -94,20 +96,22 @@ campus-repair-system/
 │   ├─ admin.html base-data.html    用户与审核、基础数据维护
 │   ├─ messages.html 404.html       消息通知、错误页
 │   ├─ js/  css/                    前端脚本与样式（common.js 为公共库，含上下文路径适配）
-│   └─ WEB-INF/                     web.xml、jsp/（JSP 视图层）
+│   └─ WEB-INF/
+│       ├─ web.xml                  部署描述（servlet 映射、上下文参数、会话配置）
+│       └─ jsp/                     JSP 视图层示例（index.jsp、home.jsp）
 └─ src/
     ├─ main/java/com/campus/repair/
-    │   ├─ boot/        启动入口、演示数据装载
+    │   ├─ boot/        DemoDataLoader（内存库演示数据装载，由启动监听器调用）
     │   ├─ common/      Result / PageResult / BusinessException / Validate
-    │   ├─ config/      AppConfig 配置管理（支持环境变量覆盖）
+    │   ├─ config/      AppConfig 配置管理（支持 CAMPUS_* 环境变量覆盖）
     │   ├─ domain/      8 个实体 + 枚举 + 派单评分模型 + 统计行
     │   ├─ dao/         DAO 接口 + jdbc/（MySQL 实现）+ memory/（内存实现）
     │   ├─ service/     8 个业务服务 + 事务模板
     │   ├─ util/        PasswordUtil / DateUtil / JsonUtil
     │   └─ web/         前端控制器 Dispatcher、路由注解、会话、8 个 Controller
-    ├─ main/resources/  config.properties
-    ├─ servlet-adapter/ ApiServlet、上下文监听器（Tomcat 部署用）
-    └─ test/java/       自测程序（业务自测、参数解析、JDBC 与派单定点验证）
+    ├─ main/resources/  config.properties（内置默认值；容器部署以 web.xml 为准）
+    ├─ servlet-adapter/ ApiServlet（/api/* 前端控制器）、CampusContextListener（启动初始化与自检）
+    └─ test/java/       验证程序（业务自测、参数解析、JDBC 与派单定点验证）
 ```
 
 ---
@@ -250,9 +254,9 @@ campus-repair-system/
 | 5 | 表 2.15 耗材使用表仅 5 个字段 | 表结构保持一致，通过 `t_material.unit_price` 关联计算金额（`MaterialUsage.getAmount()`）用于成本统计 | 不改变设计书物理结构，同时在统计模块满足成本核算需求 |
 | 6 | 维修进度反馈无对应表 | 新增 `t_progress` 表记录进度与延期原因 | 表 1.10 要求"进度反馈""延期原因必填"，需持久化留痕 |
 | 7 | 基础数据（楼栋/设备类型/工种）维护无对应表 | 新增 `t_base_data` 表 | 1.1.1 明确系统管理员需维护这些基础数据 |
-| 8 | 数据访问层提到 MyBatis/Hibernate | 提供等价的 JDBC 手写 SQL 实现（`dao/jdbc/`），并在 `pom.xml` 中保留 MyBatis 依赖片段 | 保证零依赖可直接运行；接口契约未变，可平滑替换实现 |
+| 8 | 数据访问层提到 MyBatis/Hibernate | 提供等价的 JDBC 手写 SQL 实现（`dao/jdbc/`），DAO 接口契约与设计书一致 | 保证零第三方依赖即可编译运行；如需替换为 MyBatis，只需新增实现类并在 `DaoFactory` 切换 |
 | 9 | 表 2.15 无唯一约束 | 增加 `uk_usage_task_mat` 唯一键，登记同一耗材时累加数量 | 防止同一任务同一耗材出现重复记录 |
-| 10 | 界面形态为 JSP 页面 | 主形态为静态页面 + JSON 接口（同一套接口契约），并附 JSP 视图层与 Tomcat 适配层 | 静态页面便于直接运行与自动化验证；JSP 形态保留在同一工程内 |
+| 10 | 界面形态为 JSP 页面 | 前端为静态页面 + JSON 接口（同一套接口契约），另在 `webapp/WEB-INF/jsp/` 提供 JSP 视图层（登录页、工作台） | 静态页面便于自动化验证与团队分工；JSP 形态保留在同一工程内，可按需扩展 |
 
 ---
 
@@ -280,13 +284,17 @@ campus-repair-system/
 评价与评价审核回复、统计报表全部指标、撤销与催办规则、报修人数据隔离、
 账户审核/锁定/解锁/基础数据维护、账户信息与密码维护、消息已读、超时监督与耗材管理。
 
-**三种运行形态均已通过**：
+**各验证形态均已通过**：
 
-| 运行形态 | 启动方式 | 自测 | 端到端 |
+| 验证形态 | 运行方式 | 自测 | 端到端 |
 | --- | --- | --- | --- |
-| 内置服务器 · 内存库 | `run.cmd 8080` | 99/99 通过 | 97/97 通过 |
-| 内置服务器 · MySQL | `run.cmd 8080 jdbc` | — | 97/97 通过 |
-| Tomcat 11 · 非根上下文 `/campus_repair_system_war` | IDEA/`startup.bat` 部署 | — | 97/97 通过 |
+| Tomcat 11 · 根上下文 `/` | IDEA/`startup.bat` 部署，`storage.mode=memory` | 99/99 通过 | 97/97 通过 |
+| Tomcat 11 · 非根上下文 `/campus_repair_system_war` | 同上（前端已做上下文自适应） | — | 97/97 通过 |
+| Tomcat 11 · MySQL 持久化 | 同上，`storage.mode=jdbc` | — | 97/97 通过（本次交付前使用内置验证入口测得） |
+
+> 说明：从本版起项目只保留"IDEA + Tomcat"一种运行方式，原先用于演示的内置 HTTP 服务器启动类已移除；
+> 上表中"MySQL 持久化"一行的 97 项断言是在该启动类移除前测得的，被测代码为同一套 `ApiServlet` 之外
+> 的 Controller/Service/DAO（两种入口共用），MySQL 相关验证结论仍然有效。
 
 ### 7.3 定点验证程序
 
@@ -314,38 +322,43 @@ campus-repair-system/
    而路由表以 `/api/...` 为基准，导致全部接口返回"接口不存在"。已改为按 `getContextPath()` 剥离前缀。
 6. **前端接口路径写死为根路径**：所有页面用 `fetch('/api/...')`，部署到非根上下文时请求打到根上下文。
    已改为上下文自适应：页面注入 `<base>` 与 `window.__CRS_BASE__`，`common.js` 的 `App.url()` 统一拼接前缀，
-   静态资源改为相对路径，并新增容器部署入口 `webapp/init.jsp`。
+   静态资源改为相对路径。
 7. **Cookie 路径冲突导致"登录后立即未登录"**：前端曾以 `document.cookie` 写 `CRS_TOKEN; path=/`，
    与容器下发的 `path=/应用上下文` 形成两个同名 Cookie，服务端可能取到过期/无效的那个。
-   已改为按上下文路径写入，且服务端与内置服务器均会从候选令牌中挑选能对应有效会话的那个。
+   已改为按上下文路径写入，且服务端会从候选令牌中挑选能对应有效会话的那个。
 8. **Servlet 参数读取冲突**：`ApiServlet` 先 `getParameter()` 再读 `getInputStream()`，
    在 Tomcat 下会拿不到 JSON 请求体。已拆分为「JSON 体自行解析 / 表单参数交由容器解析」两条互斥路径，
    并新增 `Dispatcher.dispatchWithParams()` 供容器适配层复用（避免重复读体）。
 9. **配置口令为空的静默失败**：`web.xml` 的 `db.password` 为空时，jdbc 模式连接失败却只表现为"用户名或密码错误"；
    已支持环境变量覆盖（`CAMPUS_DB_PASSWORD`），并在 `CampusContextListener` 增加启动自检，
    日志明确打印存储模式、数据库连通性与**可用账户数**，账号为 0 时给出明确处置提示。
+10. **IDEA 模块残留错误 Web Facet**：`campus-repair-system.iml` 中曾同时配置 `webapp` 与已删除的
+   `src/main/webapp` 两个 Web Facet，会导致 Artifact 选错 Web 根。已清理为单一 Facet（仅 `webapp`）。
+11. **页面跳转链接写成根路径绝对地址（"无法注册"的直接原因）**：登录页的「立即注册」链接是
+   `/register.html`，在 `/campus_repair_system_war` 上下文下会被解析成上下文之外的地址而 404；
+   同类问题共 10 处（登录↔注册互跳、404 页返回按钮、侧边栏导航、列表里的详情/处理链接、
+   登录成功后跳首页、注销后跳登录页）。已全部改为**相对路径**（`register.html`、`task.html?taskId=…` 等），
+   配合页面顶部注入的 `<base>` 在任意上下文下都能正确解析；`App.url()` 也加了防重复拼接保护。
 
 ---
 
 ## 八、部署与扩展
 
-### 8.1 内置服务器（默认，推荐用于演示与验收）
+### 8.1 运行方式：IDEA + Tomcat（唯一运行方式）
 
-`run.cmd [端口] [模式]`，前端由内置服务器托管 `webapp/` 目录，接口统一走 `/api/*`。
-
-### 8.2 Tomcat 10+ / Jetty 11+（IDEA 部署已实测通过）
+项目已按"容器部署"收敛：**不存在内置服务器启动类**，运行入口只有两个 Servlet 组件。
 
 **适配层文件**
 
 | 文件 | 作用 |
 | --- | --- |
-| `src/servlet-adapter/java/.../ApiServlet.java` | 前端控制器 Servlet，映射 `/api/*`，负责参数适配与调度 |
-| `src/servlet-adapter/java/.../CampusContextListener.java` | 读取 `web.xml` 上下文参数、初始化数据源、装载演示数据、启动自检 |
+| `src/servlet-adapter/java/.../ApiServlet.java` | 前端控制器 Servlet，映射 `/api/*`，负责参数适配（JSON/表单）、上下文路径剥离、调度与结果渲染 |
+| `src/servlet-adapter/java/.../CampusContextListener.java` | 读取 `web.xml` 上下文参数、初始化数据源、装载内存库演示数据、启动自检并打印可用账户数 |
+| `src/main/java/.../boot/DemoDataLoader.java` | 内存库演示数据（与 `db/seed.sql` 一致），由上面的监听器调用 |
 | `webapp/WEB-INF/web.xml` | 部署描述文件（servlet 映射、上下文参数、会话配置、JSP 视图保护） |
-| `webapp/init.jsp` | 容器部署起始页：注入上下文路径并渲染登录表单 |
-| `webapp/WEB-INF/jsp/index.jsp`、`home.jsp` | JSP 视图层示例 |
+| `webapp/WEB-INF/jsp/index.jsp`、`home.jsp` | JSP 视图层示例（登录页与工作台） |
 
-**部署步骤（IDEA + Tomcat 10/11）**
+### 8.2 部署步骤（IDEA + Tomcat 10/11，已实测通过）
 
 1. IDEA → `File → Project Structure → Artifacts`：新增 *Web Application: Exploded*，
    输出目录自定（如 `target/campus-repair`）：
@@ -365,14 +378,11 @@ campus-repair-system/
    ```
    `可用账户数` 为 0 表示**账号数据没准备好**，登录必然失败（详见 8.5 排查表）。
 
-**命令行方式（不依赖 IDEA）**
+**命令行方式（不依赖 IDEA，可选）**
 
 ```bat
-:: 1) 编译主程序与适配层
+:: 1) 编译全部源码（build.ps1 会自动把 Tomcat 的 servlet-api/jsp-api 加入 classpath）
 build.cmd
-"C:\...\jdk\bin\javac.exe" -encoding UTF-8 ^
-    -cp "build/classes;<TOMCAT>\lib\servlet-api.jar;<TOMCAT>\lib\jsp-api.jar" ^
-    -d build/classes @build/servlet-sources.txt
 
 :: 2) 组装部署目录（<APP> 为 Tomcat webapps 下的应用目录）
 xcopy /E /Y webapp\*              <APP>\
@@ -384,28 +394,20 @@ set JAVA_HOME=D:\Java
 <Tomcat>\bin\startup.bat
 ```
 
-**Maven 打包方式（需可访问 Maven 仓库）**
-
-```bat
-mvn clean package -DskipTests      :: 产出 target/campus-repair-system.war
-```
-
-POM 已将前端资源目录配置为项目根下的 `webapp/`（与内置服务器共用同一份资源，不存在两份副本）。
-
 ### 8.3 配置项与生效位置
 
-| 配置项 | 内置服务器 | Tomcat 部署 | 说明 |
-| --- | --- | --- | --- |
-| `storage.mode` | `config.properties`（默认 `memory`） | `WEB-INF/web.xml` 的 `context-param`（默认 `memory`） | `memory` 内存库演示 / `jdbc` MySQL 持久化 |
-| `db.url` / `db.username` / `db.password` | `config.properties` | `WEB-INF/web.xml` 的 `context-param` | jdbc 模式必填 |
-| `server.port` | `config.properties` | 由 Tomcat 自身 `conf/server.xml` 决定 | — |
-| `dispatch.acceptDeadlineMinutes` | 同上 | `context-param` | 接单时限（表 1.8：2 小时） |
-| `order.confirmDeadlineHours` | 同上 | `context-param` | 结果确认时限（表 1.9：24 小时） |
+| 配置项 | 取值位置（Tomcat 部署） | 说明 |
+| --- | --- | --- |
+| `storage.mode` | `WEB-INF/web.xml` 的 `context-param`（默认 `memory`） | `memory` 内存库演示 / `jdbc` MySQL 持久化 |
+| `db.url` / `db.username` / `db.password` | `WEB-INF/web.xml` 的 `context-param` | jdbc 模式必填 |
+| `dispatch.acceptDeadlineMinutes` | `WEB-INF/web.xml` 的 `context-param` | 接单时限（表 1.8：2 小时） |
+| `order.confirmDeadlineHours` | `WEB-INF/web.xml` 的 `context-param` | 结果确认时限（表 1.9：24 小时） |
+| 监听端口 / 上下文路径 | Tomcat 的 `conf/server.xml` 与 IDEA 的运行配置 | 与本项目配置无关 |
 
-**配置优先级（高 → 低）**：环境变量（如 `CAMPUS_DB_PASSWORD`）> `-D` 系统属性 / `web.xml` 上下文参数 >
-`config.properties` > 内置默认值。
+**配置优先级（高 → 低）**：环境变量（如 `CAMPUS_DB_PASSWORD`）> `web.xml` 上下文参数（会被注入为系统属性）>
+classpath 下 `config.properties`（仅作默认值）> 内置默认值。
 
-推荐用环境变量传库密码，避免明文写进仓库：
+推荐用环境变量传库密码，避免明文写进仓库（IDEA：Tomcat 运行配置 → `Environment variables`）：
 
 ```bat
 set CAMPUS_DB_PASSWORD=你的密码
@@ -432,3 +434,5 @@ set CAMPUS_DB_PASSWORD=你的密码
 | 接口返回 500 且日志有 `ClassNotFoundException: com.mysql.cj.jdbc.Driver` | `WEB-INF/lib` 缺少 MySQL 驱动 | 把 `lib/mysql-connector-j-8.3.0.jar` 复制进 `WEB-INF/lib` |
 | 登录成功但后续接口返回 `1003 登录状态已失效` | 浏览器同时携带两个同名 `CRS_TOKEN` Cookie（旧版本以 `path=/` 写入所致） | 使用当前版本（Cookie 按上下文路径写入，且服务端会挑选有效令牌）；清一次浏览器 Cookie 即可 |
 | 应用启动失败，日志提示 servlet 映射冲突 | 同一 Tomcat 中其他应用（如 `SecondPractice_041_war`）自身配置有误，与本项目无关 | 在 IDEA 的 Tomcat 配置中移除该应用的 Deployment，或单独为它排查 |
+| IDEA 里 Artifact 的 Web 根指向一个不存在的目录 | 模块曾有多个 Web Facet（历史遗留 `src/main/webapp`） | 已清理为单一 Facet（仅 `webapp`）；若仍异常，删掉模块 Facet 后重新添加 Web Facet 指向 `webapp` 即可 |
+| 点「还没有账户？立即注册」跳到 404（或登录成功后停在 404） | 页面里的跳转链接写成根路径绝对地址（如 `/register.html`），在 `/应用上下文` 部署下会跳到上下文之外 | 已修复：页面跳转与静态资源全部改为**相对路径**（配合页面顶部注入的 `<base>`，任意上下文均可解析）；若你自行加链接，请不要用 `/xxx.html` 这种根路径写法 |

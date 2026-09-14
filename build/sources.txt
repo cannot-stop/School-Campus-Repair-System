@@ -1,4 +1,3 @@
-src/main/java/com/campus/repair/boot/CampusRepairApplication.java
 src/main/java/com/campus/repair/boot/DemoDataLoader.java
 src/main/java/com/campus/repair/common/BusinessException.java
 src/main/java/com/campus/repair/common/PageResult.java
@@ -78,7 +77,6 @@ src/main/java/com/campus/repair/web/RequestContext.java
 src/main/java/com/campus/repair/web/Route.java
 src/main/java/com/campus/repair/web/Session.java
 src/main/java/com/campus/repair/web/SessionManager.java
-src/main/java/com/campus/repair/web/StaticFileHandler.java
 src/main/java/com/campus/repair/web/View.java
 src/main/java/com/campus/repair/web/controller/AccountController.java
 src/main/java/com/campus/repair/web/controller/BaseController.java
@@ -89,3 +87,5 @@ src/main/java/com/campus/repair/web/controller/MessageController.java
 src/main/java/com/campus/repair/web/controller/RepairController.java
 src/main/java/com/campus/repair/web/controller/ReportController.java
 src/main/java/com/campus/repair/web/controller/StatController.java
+src/servlet-adapter/java/com/campus/repair/web/servlet/ApiServlet.java
+src/servlet-adapter/java/com/campus/repair/web/servlet/CampusContextListener.java

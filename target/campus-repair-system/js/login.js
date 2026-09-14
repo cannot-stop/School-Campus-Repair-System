@@ -1,7 +1,7 @@
 /* 登录页脚本（对应设计书表 1.3 登录功能点） */
 (function () {
     if (App.token() && App.user()) {
-        location.href = App.url('/home.html');
+        location.href = 'home.html';
         return;
     }
 
@@ -23,7 +23,7 @@
         App.api('/api/account/login', data).done(function (result) {
             App.setSession(result.token, result);
             App.toast('登录成功，欢迎 ' + result.realName, 'success');
-            setTimeout(function () { location.href = App.url('/home.html'); }, 350);
+            setTimeout(function () { location.href = 'home.html'; }, 350);
         }).fail(function (res) {
             showError(res.message || '登录失败');
         });
