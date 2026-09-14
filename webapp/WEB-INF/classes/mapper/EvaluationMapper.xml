@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     评价 Mapper（对应设计书表 2.16 t_evaluation 与 2.2.6 EvaluationDao）
+     ============================================================================ -->
+<mapper namespace="com.campus.repair.dao.mapper.EvaluationMapper">
+
+    <resultMap id="EvaluationMap" type="com.campus.repair.domain.Evaluation">
+        <id     property="evalId"        column="eval_id"/>
+        <result property="orderId"       column="order_id"/>
+        <result property="score"         column="score"/>
+        <result property="comment"       column="comment"/>
+        <result property="reply"         column="reply"/>
+        <result property="auditStatus"   column="audit_status"/>
+        <result property="createTime"    column="create_time"/>
+        <result property="orderNo"       column="order_no"/>
+        <result property="category"      column="category"/>
+        <result property="reporterName"  column="reporter_name"/>
+        <result property="workerName"    column="worker_name"/>
+    </resultMap>
+
+    <sql id="columns">
+        e.eval_id, e.order_id, e.score, e.comment, e.reply, e.audit_status, e.create_time,
+        o.order_id AS order_no, o.category,
+        ru.real_name AS reporter_name, w.name AS worker_name
+    </sql>
+
+    <sql id="fromJoin">
+        FROM t_evaluation e
+        LEFT JOIN t_repair_order o ON o.order_id = e.order_id
+        LEFT JOIN t_user ru ON ru.user_id = o.user_id
+        LEFT JOIN t_repair_task t ON t.task_id = (
+            SELECT t2.task_id FROM t_repair_task t2
+             WHERE t2.order_id = o.order_id AND t2.status NOT IN (4, 5, 6)
+             ORDER BY t2.task_id DESC LIMIT 1)
+        LEFT JOIN t_worker w ON w.worker_id = t.worker_id
+    </sql>
+
+    <insert id="insert" parameterType="com.campus.repair.domain.Evaluation"
+            useGeneratedKeys="true" keyProperty="evalId" keyColumn="eval_id">
+        INSERT INTO t_evaluation (order_id, score, comment, reply, audit_status, create_time)
+        VALUES (#{orderId}, #{score}, #{comment}, #{reply}, #{auditStatus}, #{createTime})
+    </insert>
+
+    <update id="update" parameterType="com.campus.repair.domain.Evaluation">
+        UPDATE t_evaluation
+           SET score = #{score}, comment = #{comment}, reply = #{reply}, audit_status = #{auditStatus}
+         WHERE eval_id = #{evalId}
+    </update>
+
+    <update id="updateReply">
+        UPDATE t_evaluation SET reply = #{reply} WHERE eval_id = #{evalId}
+    </update>
+
+    <update id="updateAuditStatus">
+        UPDATE t_evaluation SET audit_status = #{auditStatus} WHERE eval_id = #{evalId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM t_evaluation WHERE eval_id = #{evalId}
+    </delete>
+
+    <select id="findById" resultMap="EvaluationMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/> WHERE e.eval_id = #{evalId}
+    </select>
+
+    <select id="findByOrder" resultMap="EvaluationMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/> WHERE e.order_id = #{orderId}
+    </select>
+
+    <select id="findAll" resultMap="EvaluationMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/> ORDER BY e.create_time DESC
+    </select>
+
+    <select id="findByAuditStatus" resultMap="EvaluationMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/>
+         WHERE e.audit_status = #{auditStatus} ORDER BY e.create_time DESC
+    </select>
+
+    <select id="findByWorker" resultMap="EvaluationMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/>
+         WHERE t.worker_id = #{workerId} ORDER BY e.create_time DESC
+    </select>
+
+    <!-- 平均评分：仅统计审核通过的评价；无数据返回 null，由 DaoImpl 转为 0 -->
+    <select id="avgScore" resultType="java.lang.Double">
+        SELECT AVG(score) FROM t_evaluation WHERE audit_status = 1
+    </select>
+
+    <select id="avgScoreByWorker" resultType="java.lang.Double">
+        SELECT AVG(e.score)
+          FROM t_evaluation e
+          JOIN t_repair_task t ON t.order_id = e.order_id AND t.status = 3
+         WHERE t.worker_id = #{workerId}
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(*) FROM t_evaluation
+    </select>
+
+</mapper>

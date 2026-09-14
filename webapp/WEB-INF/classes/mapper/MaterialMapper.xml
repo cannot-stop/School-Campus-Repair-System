@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     耗材 Mapper（对应设计书表 2.14 t_material 与 2.2.6 MaterialDao）
+     ============================================================================ -->
+<mapper namespace="com.campus.repair.dao.mapper.MaterialMapper">
+
+    <resultMap id="MaterialMap" type="com.campus.repair.domain.Material">
+        <id     property="matId"     column="mat_id"/>
+        <result property="matName"   column="mat_name"/>
+        <result property="spec"      column="spec"/>
+        <result property="stock"     column="stock"/>
+        <result property="unitPrice" column="unit_price"/>
+    </resultMap>
+
+    <sql id="columns">
+        mat_id, mat_name, spec, stock, unit_price
+    </sql>
+
+    <insert id="insert" parameterType="com.campus.repair.domain.Material"
+            useGeneratedKeys="true" keyProperty="matId" keyColumn="mat_id">
+        INSERT INTO t_material (mat_name, spec, stock, unit_price)
+        VALUES (#{matName}, #{spec}, #{stock}, #{unitPrice})
+    </insert>
+
+    <update id="update" parameterType="com.campus.repair.domain.Material">
+        UPDATE t_material SET mat_name = #{matName}, spec = #{spec}, stock = #{stock}, unit_price = #{unitPrice}
+         WHERE mat_id = #{matId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM t_material WHERE mat_id = #{matId}
+    </delete>
+
+    <select id="findById" resultMap="MaterialMap">
+        SELECT <include refid="columns"/> FROM t_material WHERE mat_id = #{matId}
+    </select>
+
+    <select id="findByNameAndSpec" resultMap="MaterialMap">
+        SELECT <include refid="columns"/> FROM t_material
+         WHERE mat_name = #{matName}
+        <choose>
+            <when test="spec == null">AND spec IS NULL</when>
+            <otherwise>AND spec = #{spec}</otherwise>
+        </choose>
+    </select>
+
+    <select id="findAll" resultMap="MaterialMap">
+        SELECT <include refid="columns"/> FROM t_material ORDER BY mat_id
+    </select>
+
+    <select id="findLowStock" resultMap="MaterialMap">
+        SELECT <include refid="columns"/> FROM t_material WHERE stock &lt; #{threshold} ORDER BY stock ASC
+    </select>
+
+    <!-- 扣减库存：条件更新保证并发下不会出现负库存 -->
+    <update id="deductStock">
+        UPDATE t_material SET stock = stock - #{useCount}
+         WHERE mat_id = #{matId} AND stock &gt;= #{useCount}
+    </update>
+
+    <update id="addStock">
+        UPDATE t_material SET stock = stock + #{count} WHERE mat_id = #{matId}
+    </update>
+
+</mapper>

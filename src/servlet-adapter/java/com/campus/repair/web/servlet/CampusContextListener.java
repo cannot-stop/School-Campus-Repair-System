@@ -3,6 +3,7 @@ package com.campus.repair.web.servlet;
 import com.campus.repair.config.AppConfig;
 import com.campus.repair.dao.DaoFactory;
 import com.campus.repair.dao.jdbc.Database;
+import com.campus.repair.dao.mybatis.MyBatisSessionFactory;
 
 import jakarta.servlet.ServletContextEvent;
 import jakarta.servlet.ServletContextListener;
@@ -48,20 +49,46 @@ public class CampusContextListener implements ServletContextListener {
 
         // 4) 启动自检：数据库连通性 + 可用账号数
         int accountCount = countAccounts();
-        String dbStatus = DaoFactory.isJdbcMode() ? Database.testConnection() : "（内存库模式，未连接数据库）";
+        String dbStatus;
+        if (DaoFactory.isMemoryMode()) {
+            dbStatus = "（内存库模式，未连接数据库）";
+        } else if (DaoFactory.isMyBatisMode()) {
+            dbStatus = MyBatisSessionFactory.testConnection();
+        } else {
+            dbStatus = Database.testConnection();
+        }
         log(event, "校园报修系统启动完成：存储模式=" + DaoFactory.mode()
-                + "，数据库=" + dbStatus + "，可用账户数=" + accountCount);
+                + "，数据访问=" + describeDao() + "，数据库=" + dbStatus + "，可用账户数=" + accountCount);
 
-        if (DaoFactory.isJdbcMode() && dbStatus.startsWith("FAILED")) {
-            log(event, "[错误] 数据库连接失败，登录将不可用。请检查 web.xml 的 db.url/db.username/db.password，"
-                    + "或设置环境变量 CAMPUS_DB_PASSWORD 覆盖密码；并确认已执行 db/schema.sql 与 db/seed.sql。");
+        if (DaoFactory.isDatabaseMode() && dbStatus.startsWith("FAILED")) {
+            if (DaoFactory.isMyBatisMode() && !MyBatisSessionFactory.configAvailable()) {
+                // 这种失败与数据库账号密码无关：MyBatis 的 XML 配置没被打进 WEB-INF/classes
+                log(event, "[错误] 数据库连接失败：MyBatis 配置未进入类路径（WEB-INF/classes 下缺少 mybatis-config.xml"
+                        + " 或 mapper/*.xml），与 db.url/db.username/db.password 无关。"
+                        + "请确认部署包的 WEB-INF/classes 内含这些文件（本项目已把 src/main/resources 镜像到 "
+                        + "webapp/WEB-INF/classes，执行 scripts\\build.ps1 可重新同步），再重新构建 artifact。");
+            } else {
+                log(event, "[错误] 数据库连接失败，登录将不可用。请检查 web.xml 的 db.url/db.username/db.password，"
+                        + "或设置环境变量 CAMPUS_DB_PASSWORD 覆盖密码；并确认已执行 db/schema.sql 与 db/seed.sql。");
+            }
         } else if (accountCount == 0) {
             log(event, "[错误] 当前没有任何账户数据，登录将不可用："
-                    + (DaoFactory.isJdbcMode() ? "请执行 db/schema.sql 与 db/seed.sql。" : "内存库演示数据装载失败。"));
+                    + (DaoFactory.isDatabaseMode() ? "请执行 db/schema.sql 与 db/seed.sql。" : "内存库演示数据装载失败。"));
         } else {
             log(event, "演示账号：student/123456、teacher/123456、worker01-03/worker123、"
                     + "manager/manager123、admin/admin123");
         }
+    }
+
+    /** 描述当前使用的数据访问实现（便于确认 MyBatis Mapper 是否生效） */
+    private String describeDao() {
+        if (DaoFactory.isMemoryMode()) {
+            return "内存库 Dao（MemoryXxxDaoImpl）";
+        }
+        if (DaoFactory.isMyBatisMode()) {
+            return "MyBatis Mapper（resources/mapper/*.xml）";
+        }
+        return "手写 SQL 的 JDBC Dao（JdbcXxxDaoImpl）";
     }
 
     /** 统计当前可用账户数（用于启动自检） */

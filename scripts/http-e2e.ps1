@@ -275,27 +275,36 @@ foreach ($row in $teacherOrders.data.rows) { if ($row.reporterUsername -ne "teac
 Check "报修人只能查询本人报修单" $onlyMine ("共 " + $teacherOrders.data.rows.Count + " 条")
 
 Section "13. 系统管理员功能"
+# 本次运行的唯一测试账号（持久化模式下重复执行不会与既有数据冲突）
+$stamp = Get-Date -Format "MMddHHmmss"
+$e2eUser = "e2e_" + $stamp
+$e2eStudentNo = "E2E" + $stamp
+# 手机号需满足 1[3-9] 后跟 9 位数字：用运行时刻的时分秒毫秒补足
+$e2ePhone = "139" + (Get-Date).ToString("HHmmssfff").Substring(1, 8)
+# 资料修改用的手机号同样必须唯一：写死常量会让脚本第二次运行就撞上上次运行的账号
+# （表现为"该手机号已被其他账户使用"），这里用不同号段再次按运行时刻生成
+$e2eProfilePhone = "137" + (Get-Date).ToString("HHmmssfff").Substring(1, 8)
 $users = Api "GET" "/api/account/list" $null $admin
 Check "账户列表查询成功" ($users.code -eq 0 -and $users.data.users.Count -gt 0) ("账户 " + $users.data.users.Count + " 个")
 Check "在线会话统计可用" ($users.data.online -gt 0) ("在线 " + $users.data.online)
 $register = Api "POST" "/api/account/register" @{
-    username = "e2e_student"; password = "e2epass123"; realName = "验证学生"
-    studentNo = "E2E2024001"; phone = "13911110001"; role = "reporter"
+    username = $e2eUser; password = "e2epass123"; realName = "验证学生"
+    studentNo = $e2eStudentNo; phone = $e2ePhone; role = "reporter"
 } $null
 Check "新用户注册成功并进入待审核" ($register.code -eq 0) $register.message
 $dupRegister = Api "POST" "/api/account/register" @{
-    username = "e2e_student"; password = "e2epass123"; realName = "重复用户"
-    studentNo = "E2E2024002"; phone = "13911110002"; role = "reporter"
+    username = $e2eUser; password = "e2epass123"; realName = "重复用户"
+    studentNo = $e2eStudentNo + "X"; phone = $e2ePhone + "9"; role = "reporter"
 } $null
 Check "重复用户名注册被拒绝" ($dupRegister.code -ne 0) $dupRegister.message
 $pending = Api "GET" "/api/account/pending" $null $admin
-$target = $pending.data | Where-Object { $_.username -eq "e2e_student" }
+$target = $pending.data | Where-Object { $_.username -eq $e2eUser }
 Check "待审核列表包含新注册用户" ($null -ne $target)
-$loginBeforeAudit = Api "POST" "/api/account/login" @{ username = "e2e_student"; password = "e2epass123" } $null
+$loginBeforeAudit = Api "POST" "/api/account/login" @{ username = $e2eUser; password = "e2epass123" } $null
 Check "未审核账户无法登录" ($loginBeforeAudit.code -ne 0) $loginBeforeAudit.message
 $auditUser = Api "POST" "/api/account/audit" @{ userId = $target.userId; auditStatus = "1" } $admin
 Check "实名审核通过" ($auditUser.code -eq 0) $auditUser.message
-$newSession = Login "e2e_student" "e2epass123"
+$newSession = Login $e2eUser "e2epass123"
 Check "审核通过后可以登录" ($null -ne $newSession)
 $notify = Api "GET" "/api/message/list" $null $newSession
 $hasAuditMsg = $false
@@ -303,7 +312,7 @@ foreach ($m in $notify.data.messages) { if ($m.msgType -eq "审核") { $hasAudit
 Check "用户收到审核结果通知" $hasAuditMsg
 $lock = Api "POST" "/api/account/lock" @{ userId = $target.userId; locked = "true" } $admin
 Check "锁定账户成功" ($lock.code -eq 0) $lock.message
-$lockedLogin = Api "POST" "/api/account/login" @{ username = "e2e_student"; password = "e2epass123" } $null
+$lockedLogin = Api "POST" "/api/account/login" @{ username = $e2eUser; password = "e2epass123" } $null
 Check "锁定后无法登录" ($lockedLogin.code -ne 0) $lockedLogin.message
 $unlock = Api "POST" "/api/account/lock" @{ userId = $target.userId; locked = "false" } $admin
 Check "解锁账户成功" ($unlock.code -eq 0) $unlock.message
@@ -319,13 +328,13 @@ $profile = Api "GET" "/api/account/profile" $null $newSession
 Check "个人信息查询成功" ($profile.code -eq 0) ($profile.data.roleText)
 $badPhone = Api "POST" "/api/account/modifyInfo" @{ phone = "12345"; realName = "验证学生" } $newSession
 Check "手机号格式校验生效" ($badPhone.code -ne 0) $badPhone.message
-$modify = Api "POST" "/api/account/modifyInfo" @{ phone = "13911110009"; realName = "验证学生" } $newSession
-Check "修改账户信息成功" ($modify.code -eq 0) $modify.message
+$modify = Api "POST" "/api/account/modifyInfo" @{ phone = $e2eProfilePhone; realName = "验证学生" } $newSession
+Check "修改账户信息成功" ($modify.code -eq 0) ($modify.message + "（新手机号 " + $e2eProfilePhone + "）")
 $wrongOld = Api "POST" "/api/account/modifyPassword" @{ oldPassword = "wrong"; newPassword = "newpass456" } $newSession
 Check "原密码错误被拒绝" ($wrongOld.code -ne 0) $wrongOld.message
 $modifyPwd = Api "POST" "/api/account/modifyPassword" @{ oldPassword = "e2epass123"; newPassword = "newpass456"; confirmPassword = "newpass456" } $newSession
 Check "修改密码成功" ($modifyPwd.code -eq 0) $modifyPwd.message
-$newLogin = Api "POST" "/api/account/login" @{ username = "e2e_student"; password = "newpass456" } $null
+$newLogin = Api "POST" "/api/account/login" @{ username = $e2eUser; password = "newpass456" } $null
 Check "新密码可以登录" ($newLogin.code -eq 0)
 
 Section "15. 消息通知"

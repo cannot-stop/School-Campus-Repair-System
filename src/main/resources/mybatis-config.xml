@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<!-- ============================================================================
+     校园报修系统 · MyBatis 全局配置（对应设计书 2.1 数据访问层）
+
+     说明：
+       1. 数据源用 POOLED（MyBatis 内置连接池）；连接参数来自 AppConfig，
+          即在 web.xml 的 context-param / config.properties / 环境变量中配置；
+       2. 事务交给程序管理（JDBC 事务），由 MyBatisSessionFactory 的
+          begin/commit/rollback 统一控制，满足设计书
+          "库存扣减与耗材使用记录的写入需在同一个事务中完成"的要求；
+       3. 下划线列名到驼峰属性名通过 resultMap 显式映射（未启用 mapUnderscoreToCamelCase，
+          以保证设计书字段名与实体属性的对应关系一目了然）。
+     ============================================================================ -->
+<configuration>
+
+    <settings>
+        <!-- 打印执行的 SQL（isDebug 由外部按需开启，默认 false 以免刷屏） -->
+        <setting name="logImpl" value="SLF4J"/>
+        <!-- 延迟加载关联对象 -->
+        <setting name="lazyLoadingEnabled" value="true"/>
+        <!-- 允许返回值为 null 的字段参与映射 -->
+        <setting name="callSettersOnNulls" value="true"/>
+        <setting name="defaultStatementTimeout" value="30"/>
+        <setting name="cacheEnabled" value="false"/>
+    </settings>
+
+    <typeAliases>
+        <typeAlias alias="User" type="com.campus.repair.domain.User"/>
+        <typeAlias alias="Worker" type="com.campus.repair.domain.Worker"/>
+        <typeAlias alias="RepairOrder" type="com.campus.repair.domain.RepairOrder"/>
+        <typeAlias alias="RepairTask" type="com.campus.repair.domain.RepairTask"/>
+        <typeAlias alias="Material" type="com.campus.repair.domain.Material"/>
+        <typeAlias alias="MaterialUsage" type="com.campus.repair.domain.MaterialUsage"/>
+        <typeAlias alias="Evaluation" type="com.campus.repair.domain.Evaluation"/>
+        <typeAlias alias="Message" type="com.campus.repair.domain.Message"/>
+        <typeAlias alias="Progress" type="com.campus.repair.domain.Progress"/>
+        <typeAlias alias="RepairOrderQuery" type="com.campus.repair.dao.mapper.RepairOrderQuery"/>
+    </typeAliases>
+
+    <environments default="campusRepair">
+        <environment id="campusRepair">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="${db.driver}"/>
+                <property name="url" value="${db.url}"/>
+                <property name="username" value="${db.username}"/>
+                <property name="password" value="${db.password}"/>
+                <!-- 连接池参数（按校园规模设置；可在此调整） -->
+                <property name="poolMaximumActiveConnections" value="20"/>
+                <property name="poolMaximumIdleConnections" value="5"/>
+                <property name="poolMaximumCheckoutTime" value="20000"/>
+                <property name="poolPingEnabled" value="false"/>
+            </dataSource>
+        </environment>
+    </environments>
+
+    <mappers>
+        <mapper resource="mapper/UserMapper.xml"/>
+        <mapper resource="mapper/WorkerMapper.xml"/>
+        <mapper resource="mapper/RepairOrderMapper.xml"/>
+        <mapper resource="mapper/RepairTaskMapper.xml"/>
+        <mapper resource="mapper/MaterialMapper.xml"/>
+        <mapper resource="mapper/MaterialUsageMapper.xml"/>
+        <mapper resource="mapper/EvaluationMapper.xml"/>
+        <mapper resource="mapper/MessageMapper.xml"/>
+        <mapper resource="mapper/ProgressMapper.xml"/>
+        <mapper resource="mapper/BaseDataMapper.xml"/>
+    </mappers>
+
+</configuration>

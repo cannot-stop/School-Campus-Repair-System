@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     耗材使用 Mapper（对应设计书表 2.15 t_material_usage 与 2.2.6 MaterialUsageDao）
+     查询通过 LEFT JOIN 带出耗材名称、规格与单价（成本统计依赖）
+     ============================================================================ -->
+<mapper namespace="com.campus.repair.dao.mapper.MaterialUsageMapper">
+
+    <resultMap id="UsageMap" type="com.campus.repair.domain.MaterialUsage">
+        <id     property="useId"     column="use_id"/>
+        <result property="taskId"    column="task_id"/>
+        <result property="matId"     column="mat_id"/>
+        <result property="useCount"  column="use_count"/>
+        <result property="useTime"   column="use_time"/>
+        <result property="matName"   column="mat_name"/>
+        <result property="spec"      column="spec"/>
+        <result property="unitPrice" column="unit_price"/>
+    </resultMap>
+
+    <sql id="columns">
+        u.use_id, u.task_id, u.mat_id, u.use_count, u.use_time,
+        m.mat_name, m.spec, m.unit_price
+    </sql>
+
+    <sql id="fromJoin">
+        FROM t_material_usage u LEFT JOIN t_material m ON m.mat_id = u.mat_id
+    </sql>
+
+    <insert id="insert" parameterType="com.campus.repair.domain.MaterialUsage"
+            useGeneratedKeys="true" keyProperty="useId" keyColumn="use_id">
+        INSERT INTO t_material_usage (task_id, mat_id, use_count, use_time)
+        VALUES (#{taskId}, #{matId}, #{useCount}, #{useTime})
+    </insert>
+
+    <update id="updateCount">
+        UPDATE t_material_usage SET use_count = #{useCount} WHERE use_id = #{useId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM t_material_usage WHERE use_id = #{useId}
+    </delete>
+
+    <delete id="deleteByTask">
+        DELETE FROM t_material_usage WHERE task_id = #{taskId}
+    </delete>
+
+    <select id="findById" resultMap="UsageMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/> WHERE u.use_id = #{useId}
+    </select>
+
+    <select id="findByTaskAndMaterial" resultMap="UsageMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/>
+         WHERE u.task_id = #{taskId} AND u.mat_id = #{matId}
+    </select>
+
+    <select id="findByTask" resultMap="UsageMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/>
+         WHERE u.task_id = #{taskId} ORDER BY u.use_id
+    </select>
+
+    <select id="findAll" resultMap="UsageMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/> ORDER BY u.use_id
+    </select>
+
+</mapper>

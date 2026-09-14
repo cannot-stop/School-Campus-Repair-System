@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     报修单 Mapper（对应设计书表 2.11 t_repair_order 与 2.2.6 RepairOrderDao）
+
+     查询一次性带出：报修人信息、当前有效维修任务、维修人员信息、评价信息，
+     与设计书 2.2.3.2 的 findByCondition() 按条件分页查询语义一致。
+     ============================================================================ -->
+<mapper namespace="com.campus.repair.dao.mapper.RepairOrderMapper">
+
+    <resultMap id="OrderMap" type="com.campus.repair.domain.RepairOrder">
+        <id     property="orderId"         column="order_id"/>
+        <result property="userId"          column="user_id"/>
+        <result property="building"        column="building"/>
+        <result property="floor"           column="floor"/>
+        <result property="room"            column="room"/>
+        <result property="category"        column="category"/>
+        <result property="description"     column="description"/>
+        <result property="images"          column="images"/>
+        <result property="status"          column="status"/>
+        <result property="priority"        column="priority"/>
+        <result property="urgeCount"       column="urge_count"/>
+        <result property="rejectReason"    column="reject_reason"/>
+        <result property="createTime"      column="create_time"/>
+        <result property="updateTime"      column="update_time"/>
+        <!-- 关联展示字段 -->
+        <result property="reporterUsername" column="reporter_username"/>
+        <result property="reporterName"     column="reporter_name"/>
+        <result property="reporterPhone"    column="reporter_phone"/>
+        <result property="taskId"           column="task_id"/>
+        <result property="workerId"         column="worker_id"/>
+        <result property="workerName"       column="worker_name"/>
+        <result property="workerPhone"      column="worker_phone"/>
+        <result property="taskStatus"       column="task_status"/>
+        <result property="dispatchTime"     column="dispatch_time"/>
+        <result property="acceptTime"       column="accept_time"/>
+        <result property="finishTime"       column="finish_time"/>
+        <result property="result"           column="result"/>
+        <result property="remark"           column="remark"/>
+        <result property="evalScore"        column="eval_score"/>
+        <result property="evalComment"      column="eval_comment"/>
+        <result property="evalReply"        column="eval_reply"/>
+    </resultMap>
+
+    <sql id="columns">
+        o.order_id, o.user_id, o.building, o.floor, o.room, o.category, o.description, o.images,
+        o.status, o.priority, o.urge_count, o.reject_reason, o.create_time, o.update_time,
+        u.username AS reporter_username, u.real_name AS reporter_name, u.phone AS reporter_phone,
+        t.task_id, t.worker_id, w.name AS worker_name, w.phone AS worker_phone,
+        t.status AS task_status, t.dispatch_time, t.accept_time, t.finish_time,
+        t.result, t.remark,
+        e.score AS eval_score, e.comment AS eval_comment, e.reply AS eval_reply
+    </sql>
+
+    <sql id="fromJoin">
+        FROM t_repair_order o
+        LEFT JOIN t_user u ON u.user_id = o.user_id
+        LEFT JOIN t_repair_task t ON t.task_id = (
+            SELECT t2.task_id FROM t_repair_task t2
+             WHERE t2.order_id = o.order_id AND t2.status NOT IN (4, 5, 6)
+             ORDER BY t2.task_id DESC LIMIT 1)
+        LEFT JOIN t_worker w ON w.worker_id = t.worker_id
+        LEFT JOIN t_evaluation e ON e.order_id = o.order_id
+    </sql>
+
+    <!-- 查询条件（字段名与 OrderQuery / RepairOrderQuery 一致） -->
+    <sql id="whereCondition">
+        <where>
+            <if test="orderId != null">AND o.order_id = #{orderId}</if>
+            <if test="userId != null">AND o.user_id = #{userId}</if>
+            <if test="status != null">AND o.status = #{status}</if>
+            <if test="category != null and category != ''">AND o.category = #{category}</if>
+            <if test="building != null and building != ''">AND o.building = #{building}</if>
+            <if test="priority != null">AND o.priority = #{priority}</if>
+            <if test="workerId != null">AND t.worker_id = #{workerId}</if>
+            <if test="keyword != null and keyword != ''">
+                AND (o.description LIKE CONCAT('%', #{keyword}, '%')
+                     OR o.room LIKE CONCAT('%', #{keyword}, '%')
+                     OR o.building LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="beginTime != null">AND o.create_time &gt;= #{beginTime}</if>
+            <if test="endTime != null">AND o.create_time &lt;= #{endTime}</if>
+        </where>
+    </sql>
+
+    <insert id="insert" parameterType="com.campus.repair.domain.RepairOrder"
+            useGeneratedKeys="true" keyProperty="orderId" keyColumn="order_id">
+        INSERT INTO t_repair_order (user_id, building, floor, room, category, description, images,
+                                    status, priority, urge_count, create_time, update_time)
+        VALUES (#{userId}, #{building}, #{floor}, #{room}, #{category}, #{description}, #{images},
+                #{status}, #{priority}, #{urgeCount}, #{createTime}, #{updateTime})
+    </insert>
+
+    <!--
+      局部更新：仅覆盖非空字段。
+      业务场景：审核受理时只调整优先级，不能把类别/地点/描述等其他字段写成 NULL。
+    -->
+    <update id="updateSelective" parameterType="com.campus.repair.domain.RepairOrder">
+        UPDATE t_repair_order
+        <set>
+            <if test="building != null">building = #{building},</if>
+            <if test="floor != null">floor = #{floor},</if>
+            <if test="room != null">room = #{room},</if>
+            <if test="category != null">category = #{category},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="images != null">images = #{images},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="priority != null">priority = #{priority},</if>
+            <if test="rejectReason != null">reject_reason = #{rejectReason},</if>
+            update_time = NOW()
+        </set>
+        WHERE order_id = #{orderId}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE t_repair_order SET status = #{status}, update_time = NOW() WHERE order_id = #{orderId}
+    </update>
+
+    <update id="updateReject">
+        UPDATE t_repair_order
+           SET status = #{status}, reject_reason = #{rejectReason}, update_time = NOW()
+         WHERE order_id = #{orderId}
+    </update>
+
+    <update id="increaseUrgeCount">
+        UPDATE t_repair_order
+           SET urge_count = COALESCE(urge_count, 0) + 1, update_time = NOW()
+         WHERE order_id = #{orderId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM t_repair_order WHERE order_id = #{orderId}
+    </delete>
+
+    <select id="findById" resultMap="OrderMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/> WHERE o.order_id = #{orderId}
+    </select>
+
+    <select id="findByCondition" parameterType="com.campus.repair.dao.mapper.RepairOrderQuery"
+            resultMap="OrderMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/>
+        <include refid="whereCondition"/>
+        ORDER BY o.priority DESC, o.create_time DESC
+        <if test="limit != null">LIMIT #{limit} OFFSET #{offset}</if>
+    </select>
+
+    <select id="countByCondition" parameterType="com.campus.repair.dao.mapper.RepairOrderQuery"
+            resultType="long">
+        SELECT COUNT(*) <include refid="fromJoin"/>
+        <include refid="whereCondition"/>
+    </select>
+
+    <select id="findByWorker" resultMap="OrderMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/>
+         WHERE t.worker_id = #{workerId}
+        <if test="status != null">AND o.status = #{status}</if>
+         ORDER BY o.priority DESC, t.dispatch_time DESC
+    </select>
+
+    <select id="findByUser" resultMap="OrderMap">
+        SELECT <include refid="columns"/> <include refid="fromJoin"/>
+         WHERE o.user_id = #{userId} ORDER BY o.create_time DESC
+    </select>
+
+    <select id="countByStatus" resultType="long">
+        SELECT COUNT(*) FROM t_repair_order WHERE status = #{status}
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(*) FROM t_repair_order
+    </select>
+
+</mapper>

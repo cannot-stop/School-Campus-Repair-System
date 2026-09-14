@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     消息通知 Mapper（对应设计书表 2.17 t_message 与 2.2.6 MessageDao）
+     ============================================================================ -->
+<mapper namespace="com.campus.repair.dao.mapper.MessageMapper">
+
+    <resultMap id="MessageMap" type="com.campus.repair.domain.Message">
+        <id     property="msgId"      column="msg_id"/>
+        <result property="userId"     column="user_id"/>
+        <result property="content"    column="content"/>
+        <result property="msgType"    column="msg_type"/>
+        <result property="isRead"     column="is_read"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="columns">
+        msg_id, user_id, content, msg_type, is_read, create_time
+    </sql>
+
+    <insert id="insert" parameterType="com.campus.repair.domain.Message"
+            useGeneratedKeys="true" keyProperty="msgId" keyColumn="msg_id">
+        INSERT INTO t_message (user_id, content, msg_type, is_read, create_time)
+        VALUES (#{userId}, #{content}, #{msgType}, #{isRead}, #{createTime})
+    </insert>
+
+    <update id="markRead">
+        UPDATE t_message SET is_read = 1 WHERE msg_id = #{msgId}
+    </update>
+
+    <update id="markAllRead">
+        UPDATE t_message SET is_read = 1 WHERE user_id = #{userId} AND is_read = 0
+    </update>
+
+    <delete id="delete">
+        DELETE FROM t_message WHERE msg_id = #{msgId}
+    </delete>
+
+    <select id="findById" resultMap="MessageMap">
+        SELECT <include refid="columns"/> FROM t_message WHERE msg_id = #{msgId}
+    </select>
+
+    <select id="findByUser" resultMap="MessageMap">
+        SELECT <include refid="columns"/> FROM t_message WHERE user_id = #{userId}
+        ORDER BY create_time DESC, msg_id DESC
+    </select>
+
+    <select id="findUnreadByUser" resultMap="MessageMap">
+        SELECT <include refid="columns"/> FROM t_message WHERE user_id = #{userId} AND is_read = 0
+        ORDER BY create_time DESC, msg_id DESC
+    </select>
+
+    <select id="countUnread" resultType="long">
+        SELECT COUNT(*) FROM t_message WHERE user_id = #{userId} AND is_read = 0
+    </select>
+
+    <select id="findAll" resultMap="MessageMap">
+        SELECT <include refid="columns"/> FROM t_message ORDER BY msg_id DESC
+    </select>
+
+</mapper>

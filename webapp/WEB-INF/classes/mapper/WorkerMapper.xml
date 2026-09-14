@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     维修人员 Mapper（对应设计书表 2.13 t_worker 与 2.2.6 WorkerDao）
+     ============================================================================ -->
+<mapper namespace="com.campus.repair.dao.mapper.WorkerMapper">
+
+    <resultMap id="WorkerMap" type="com.campus.repair.domain.Worker">
+        <id     property="workerId"      column="worker_id"/>
+        <result property="userId"        column="user_id"/>
+        <result property="name"          column="name"/>
+        <result property="phone"         column="phone"/>
+        <result property="skillTags"     column="skill_tags"/>
+        <result property="currentOrders" column="current_orders"/>
+        <result property="location"      column="location"/>
+        <result property="status"        column="status"/>
+    </resultMap>
+
+    <sql id="columns">
+        worker_id, user_id, name, phone, skill_tags, current_orders, location, status
+    </sql>
+
+    <insert id="insert" parameterType="com.campus.repair.domain.Worker"
+            useGeneratedKeys="true" keyProperty="workerId" keyColumn="worker_id">
+        INSERT INTO t_worker (user_id, name, phone, skill_tags, current_orders, location, status)
+        VALUES (#{userId}, #{name}, #{phone}, #{skillTags}, #{currentOrders}, #{location}, #{status})
+    </insert>
+
+    <update id="update" parameterType="com.campus.repair.domain.Worker">
+        UPDATE t_worker
+           SET name = #{name}, phone = #{phone}, skill_tags = #{skillTags},
+               current_orders = #{currentOrders}, location = #{location}, status = #{status}
+         WHERE worker_id = #{workerId}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE t_worker SET status = #{status} WHERE worker_id = #{workerId}
+    </update>
+
+    <update id="updateLocation">
+        UPDATE t_worker SET location = #{location} WHERE worker_id = #{workerId}
+    </update>
+
+    <!-- 在单量增减：GREATEST 保证并发下不会出现负值 -->
+    <update id="addCurrentOrders">
+        UPDATE t_worker
+           SET current_orders = GREATEST(COALESCE(current_orders, 0) + #{delta}, 0)
+         WHERE worker_id = #{workerId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM t_worker WHERE worker_id = #{workerId}
+    </delete>
+
+    <select id="findById" resultMap="WorkerMap">
+        SELECT <include refid="columns"/> FROM t_worker WHERE worker_id = #{workerId}
+    </select>
+
+    <select id="findByUserId" resultMap="WorkerMap">
+        SELECT <include refid="columns"/> FROM t_worker WHERE user_id = #{userId}
+    </select>
+
+    <select id="findAll" resultMap="WorkerMap">
+        SELECT <include refid="columns"/> FROM t_worker ORDER BY worker_id
+    </select>
+
+    <!-- 可派单的维修人员：在线，按在单量升序 -->
+    <select id="findAvailable" resultMap="WorkerMap">
+        SELECT <include refid="columns"/> FROM t_worker WHERE status = 1
+        ORDER BY COALESCE(current_orders, 0) ASC, worker_id ASC
+    </select>
+
+    <select id="findBySkill" resultMap="WorkerMap">
+        SELECT <include refid="columns"/> FROM t_worker
+         WHERE skill_tags LIKE CONCAT('%', #{skill}, '%')
+        ORDER BY COALESCE(current_orders, 0) ASC
+    </select>
+
+</mapper>

@@ -2,12 +2,18 @@ package com.campus.repair.service;
 
 import com.campus.repair.dao.DaoFactory;
 import com.campus.repair.dao.jdbc.Database;
+import com.campus.repair.dao.mybatis.MyBatisSessionFactory;
 
 /**
  * 事务模板（对应设计书 1.1.2.4"库存扣减需保证事务一致性"）。
  *
- * <p>storage.mode=jdbc 时开启真实数据库事务；内存模式（演示/自测）下为空实现，
- * 业务代码无需区分环境。</p>
+ * <p>按当前存储模式选择事务实现：</p>
+ * <ul>
+ *   <li>{@code mybatis}：{@link MyBatisSessionFactory} 的 SqlSession 事务
+ *       （同一线程内复用同一 SqlSession 与数据库连接）；</li>
+ *   <li>{@code jdbc}：{@link Database} 的 JDBC 事务；</li>
+ *   <li>{@code memory}：空实现（演示与自测环境）。</li>
+ * </ul>
  */
 public final class TxTemplate {
 
@@ -21,8 +27,11 @@ public final class TxTemplate {
 
     /** 在事务中执行 */
     public static <T> T execute(Action<T> action) {
-        boolean jdbc = !DaoFactory.isMemoryMode();
-        if (jdbc) {
+        boolean mybatis = DaoFactory.isMyBatisMode();
+        boolean jdbc = DaoFactory.isJdbcMode();
+        if (mybatis) {
+            MyBatisSessionFactory.begin();
+        } else if (jdbc) {
             try {
                 Database.begin();
             } catch (Exception e) {
@@ -31,20 +40,26 @@ public final class TxTemplate {
         }
         try {
             T result = action.run();
-            if (jdbc) {
+            if (mybatis) {
+                MyBatisSessionFactory.commit();
+            } else if (jdbc) {
                 Database.commit();
             }
             return result;
         } catch (RuntimeException e) {
-            if (jdbc) {
-                Database.rollback();
-            }
+            rollback(mybatis, jdbc);
             throw e;
         } catch (Error e) {
-            if (jdbc) {
-                Database.rollback();
-            }
+            rollback(mybatis, jdbc);
             throw e;
+        }
+    }
+
+    private static void rollback(boolean mybatis, boolean jdbc) {
+        if (mybatis) {
+            MyBatisSessionFactory.rollback();
+        } else if (jdbc) {
+            Database.rollback();
         }
     }
 }

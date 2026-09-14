@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     维修进度反馈 Mapper（承载设计书表 1.10 的"进度反馈"与延期原因留痕）
+     ============================================================================ -->
+<mapper namespace="com.campus.repair.dao.mapper.ProgressMapper">
+
+    <resultMap id="ProgressMap" type="com.campus.repair.domain.Progress">
+        <id     property="progressId" column="progress_id"/>
+        <result property="taskId"     column="task_id"/>
+        <result property="content"    column="content"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="columns">
+        progress_id, task_id, content, create_time
+    </sql>
+
+    <insert id="insert" parameterType="com.campus.repair.domain.Progress"
+            useGeneratedKeys="true" keyProperty="progressId" keyColumn="progress_id">
+        INSERT INTO t_progress (task_id, content, create_time)
+        VALUES (#{taskId}, #{content}, #{createTime})
+    </insert>
+
+    <delete id="deleteByTask">
+        DELETE FROM t_progress WHERE task_id = #{taskId}
+    </delete>
+
+    <select id="findByTask" resultMap="ProgressMap">
+        SELECT <include refid="columns"/> FROM t_progress WHERE task_id = #{taskId} ORDER BY create_time
+    </select>
+
+    <select id="findAll" resultMap="ProgressMap">
+        SELECT <include refid="columns"/> FROM t_progress ORDER BY create_time DESC
+    </select>
+
+</mapper>

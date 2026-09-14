@@ -7,13 +7,13 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| 技术栈 | Java 17+（已在 JDK 25 上验证）、Servlet/JSON 接口、JDBC、MySQL 8.0；零第三方依赖即可运行 |
-| 架构 | MVC 分层：8 个功能 Controller + 1 个前端控制器、8 个 Service、10 个 DAO 接口（JDBC 与内存两套实现） |
-| 代码规模 | 175 个文件、约 1.77 万行（Java 主程序 91 个文件、前端 33 个文件、自测 6 个、部署与脚本 8 个） |
+| 技术栈 | Java 17+（已在 JDK 25 上验证）、Jakarta Servlet（Tomcat 10/11）、**MyBatis 3.5 Mapper**、MySQL 8.0 |
+| 架构 | MVC 分层：8 个功能 Controller + 1 个前端控制器、8 个 Service、10 个 DAO 接口（**MyBatis** / 手写 SQL / 内存库 三套可切换实现） |
+| 持久化 | **MyBatis 3.5.16**：10 个 Mapper 接口 + 10 个 Mapper XML、99 条映射语句，SQL 全部在 `src/main/resources/mapper/*.xml` |
 | 数据库 | MySQL 8.0，`campus_repair` 库，10 张表（设计书 8 张业务表 + 2 张支撑表） |
 | 接口 | 65 个 REST 接口，统一 `Result{code,message,data}` 返回结构 |
-| 前端 | 16 个页面（HTML + 原生 JS + CSS），覆盖四类角色的全部操作 |
-| 验证 | 业务自测 99 项断言、端到端接口验证 97 项断言，内存库与 MySQL 两种模式均全部通过 |
+| 前端 | 17 个页面（HTML + 原生 JS + CSS），覆盖四类角色的全部操作 |
+| 验证 | 业务自测 99 项、MyBatis 定点验证 39 项、端到端接口验证 97 项，全部通过 |
 
 ---
 
@@ -26,7 +26,9 @@
 1. IDEA → `File → Project Structure → Artifacts`：新增 *Web Application: Exploded*（输出目录自定）：
    - `Web resource directory` 指向模块内的 **`webapp`** 目录；
    - `Available Elements` 中把 **模块的 compile output** 加入 `WEB-INF/classes`；
-   - 用 MySQL 时把 **`lib/mysql-connector-j-8.3.0.jar`** 加入 `WEB-INF/lib`。
+   - 把 `lib/` 下 **4 个 jar** 全部加入 `WEB-INF/lib`：
+     `mybatis-3.5.16.jar`、`mysql-connector-j-8.3.0.jar`、`slf4j-api-1.7.36.jar`、`slf4j-simple-1.7.36.jar`
+     （MyBatis 与 MySQL 驱动必需，slf4j 供 MyBatis 打印日志）。
 2. IDEA → `Run → Edit Configurations → Tomcat Server → Local`：
    - `Deployment` 标签页 `+` 选择该 artifact；`Application context` 填 `/` 或任意名称（如 `/campus_repair_system_war`）；
    - `Server` 标签页确认 JDK 为 17 及以上（本项目在 JDK 25 上验证）。
@@ -35,27 +37,40 @@
 > 模块的 Web Facet（`campus-repair-system.iml`）已指向 `webapp` 与 `WEB-INF/web.xml`，
 > 通常 IDEA 会自动识别；若 Artifact 列表为空，按上面第 1 步手工添加即可。
 
-### 2. 数据源：内存库（默认，开箱可登录）或 MySQL
+> **运行资源不需要手工添加**：MyBatis 的 `mybatis-config.xml`、`mapper/*.xml` 与 `config.properties`
+> 已随 Web 根一起提供——项目把它们镜像在 `webapp/WEB-INF/classes/` 下（`src/main/resources/` 是源，
+> `build.cmd` 每次编译都会自动重新同步）。原因是 IDEA 打包 Artifact 时一定会把 `webapp/` 原样复制进 WAR，
+> 所以即使 IDEA 那次只是增量构建、没有把 `src/main/resources` 拷进模块输出目录，这两个文件在部署后
+> 也一定位于类路径上。若该目录为空或提示与源文件不一致，执行一次 `build.cmd` 即可补齐。
 
-默认 `webapp/WEB-INF/web.xml` 中 `storage.mode=memory`，内置与 `db/seed.sql` 一致的演示数据，
-**无需数据库即可登录**。切到 MySQL 持久化：
+### 2. 数据源：MyBatis + MySQL（默认）或内存库演示
+
+`webapp/WEB-INF/web.xml` 中 `storage.mode=mybatis`（默认）表示 **MyBatis Mapper + MySQL**，
+需先初始化数据库；若只想快速看界面，把 `storage.mode` 改为 `memory` 即可（内置演示数据，无需数据库）。
 
 ```bat
 :: ① 建库建表 + 导入演示数据
 mysql -u root -p --default-character-set=utf8mb4 -e "source db/schema.sql"
 mysql -u root -p --default-character-set=utf8mb4 -e "source db/seed.sql"
 
-:: ② 改 webapp/WEB-INF/web.xml：storage.mode 改为 jdbc，并把 db.password 改成你的 MySQL 密码
+:: ② 确认 webapp/WEB-INF/web.xml：storage.mode=mybatis，db.password 改成你的 MySQL 密码
 ::    或（推荐）用环境变量传密码，避免明文入库：
 ::    IDEA → Tomcat 运行配置 → Environment variables 增加 CAMPUS_DB_PASSWORD=你的密码
+```
+
+启动后自检日志会明确写出实际生效的数据访问实现，例如：
+
+```
+[CampusRepair] 校园报修系统启动完成：存储模式=mybatis，数据访问=MyBatis Mapper（resources/mapper/*.xml），
+数据库=OK: MySQL 8.0.25（MyBatis MySQL Connector/J 连接池），可用账户数=8
 ```
 
 ### 3. 编译校验与验证命令（可选，Tomcat 会自行编译）
 
 ```bat
-build.cmd                                          :: 用 javac 编译全部源码（含 Servlet 适配层），提前发现编译错误
+build.cmd                                          :: 用 javac 编译全部源码（含 Servlet 适配层与 MyBatis Dao）
 build.cmd -WithSelfTest                            :: 编译并运行业务自测（99 项断言，报告 build/selftest.log）
-pwsh -File scripts\http-e2e.ps1 -Base http://127.0.0.1:8080/campus_repair_system_war   :: 端到端接口验证（97 项断言）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\http-e2e.ps1 -Base http://127.0.0.1:8080/campus_repair_system_war   :: 端到端接口验证（97 项断言）
 ```
 
 ### 4. 演示账号
@@ -85,7 +100,8 @@ campus-repair-system/
 ├─ db/
 │   ├─ schema.sql                   建库建表脚本（10 张表 + 外键、唯一约束、索引）
 │   └─ seed.sql                     演示数据（8 账户、7 报修单、4 任务等）
-├─ lib/                             MySQL 驱动（jdbc 模式，加入 WEB-INF/lib）
+├─ lib/                             第三方依赖：mybatis-3.5.16.jar、mysql-connector-j-8.3.0.jar、
+│                                   slf4j-api-1.7.36.jar、slf4j-simple-1.7.36.jar（需加入 WEB-INF/lib）
 └─ webapp/                          前端资源与 Web 配置（即 IDEA Artifact 的 Web 根）
 │   ├─ index.html register.html     登录 / 注册
 │   ├─ home.html                    工作台（按角色自适应）
@@ -98,21 +114,33 @@ campus-repair-system/
 │   ├─ js/  css/                    前端脚本与样式（common.js 为公共库，含上下文路径适配）
 │   └─ WEB-INF/
 │       ├─ web.xml                  部署描述（servlet 映射、上下文参数、会话配置）
-│       └─ jsp/                     JSP 视图层示例（index.jsp、home.jsp）
+│       ├─ classes/                 运行资源镜像：mybatis-config.xml、mapper/*.xml、config.properties
+│       │                           （由 build.cmd 从 src/main/resources 同步，随 Web 根一起打进 WAR）
+│       └─ (jsp/)                   可选视图目录，当前交付未使用（见下方说明）
 └─ src/
     ├─ main/java/com/campus/repair/
     │   ├─ boot/        DemoDataLoader（内存库演示数据装载，由启动监听器调用）
     │   ├─ common/      Result / PageResult / BusinessException / Validate
     │   ├─ config/      AppConfig 配置管理（支持 CAMPUS_* 环境变量覆盖）
     │   ├─ domain/      8 个实体 + 枚举 + 派单评分模型 + 统计行
-    │   ├─ dao/         DAO 接口 + jdbc/（MySQL 实现）+ memory/（内存实现）
+    │   ├─ dao/
+    │   │   ├─ mapper/  MyBatis Mapper 接口（10 个）+ RepairOrderQuery（分页查询入参）
+    │   │   ├─ mybatis/ MyBatis Dao 实现 + MyBatisSessionFactory（会话与事务）
+    │   │   ├─ jdbc/    手写 SQL 的对照实现（JdbcTemplate、Database 连接池）
+    │   │   └─ memory/  内存库实现（无数据库演示）
+    │   ├─ dal/         MyBatisCapabilityProbe（数据访问层自检：报告实际使用的 DAO 实现）
     │   ├─ service/     8 个业务服务 + 事务模板
     │   ├─ util/        PasswordUtil / DateUtil / JsonUtil
     │   └─ web/         前端控制器 Dispatcher、路由注解、会话、8 个 Controller
-    ├─ main/resources/  config.properties（内置默认值；容器部署以 web.xml 为准）
+    ├─ main/resources/  config.properties、mybatis-config.xml、mapper/*.xml（MyBatis SQL 源文件，
+    │                   由 build.cmd 同步一份到 webapp/WEB-INF/classes 随 WAR 部署）
     ├─ servlet-adapter/ ApiServlet（/api/* 前端控制器）、CampusContextListener（启动初始化与自检）
-    └─ test/java/       验证程序（业务自测、参数解析、JDBC 与派单定点验证）
+    └─ test/java/       验证程序（业务自测、MyBatis 定点验证、参数解析、派单与 JDBC 定点验证）
 ```
+
+> **视图层说明**：本交付的视图层由 `webapp/*.html` + `webapp/js/`（静态页面 + JSON 接口）承担，
+> 页面数量与功能见第四章；工程内**不含 `.jsp` 文件**。`web.xml` 仍配置了 `jsp-config`（UTF-8 编码）
+> 与 `/WEB-INF/jsp/*` 访问保护，若需要 JSP 形态的视图，直接在该目录下新增即可，后端接口无需改动。
 
 ---
 
@@ -254,9 +282,9 @@ campus-repair-system/
 | 5 | 表 2.15 耗材使用表仅 5 个字段 | 表结构保持一致，通过 `t_material.unit_price` 关联计算金额（`MaterialUsage.getAmount()`）用于成本统计 | 不改变设计书物理结构，同时在统计模块满足成本核算需求 |
 | 6 | 维修进度反馈无对应表 | 新增 `t_progress` 表记录进度与延期原因 | 表 1.10 要求"进度反馈""延期原因必填"，需持久化留痕 |
 | 7 | 基础数据（楼栋/设备类型/工种）维护无对应表 | 新增 `t_base_data` 表 | 1.1.1 明确系统管理员需维护这些基础数据 |
-| 8 | 数据访问层提到 MyBatis/Hibernate | 提供等价的 JDBC 手写 SQL 实现（`dao/jdbc/`），DAO 接口契约与设计书一致 | 保证零第三方依赖即可编译运行；如需替换为 MyBatis，只需新增实现类并在 `DaoFactory` 切换 |
+| 8 | 数据访问层提到 MyBatis/Hibernate | 采用 **MyBatis 3.5.16 正式实现**：10 个 Mapper 接口 + 10 个 Mapper XML（99 条语句），SQL 位于 `src/main/resources/mapper/*.xml`；另保留手写 SQL 的 `dao/jdbc/` 与 `dao/memory/` 作为对照实现，通过 `storage.mode` 一步切换 | 完全对齐设计书"数据访问层由 MyBatis 实现"的描述；保留等价实现便于对照教学与无数据库环境演示 |
 | 9 | 表 2.15 无唯一约束 | 增加 `uk_usage_task_mat` 唯一键，登记同一耗材时累加数量 | 防止同一任务同一耗材出现重复记录 |
-| 10 | 界面形态为 JSP 页面 | 前端为静态页面 + JSON 接口（同一套接口契约），另在 `webapp/WEB-INF/jsp/` 提供 JSP 视图层（登录页、工作台） | 静态页面便于自动化验证与团队分工；JSP 形态保留在同一工程内，可按需扩展 |
+| 10 | 界面形态为 JSP 页面 | 前端为静态页面 + JSON 接口（同一套接口契约），视图层由 `webapp/*.html` + `js/` 承担；工程内未放置 `.jsp` 文件 | 静态页面便于自动化验证与团队分工；`web.xml` 已保留 `jsp-config` 与 `/WEB-INF/jsp/*` 访问保护，如需 JSP 形态可直接在 `webapp/WEB-INF/jsp/` 下补充视图，后端接口无需改动 |
 
 ---
 
@@ -290,17 +318,21 @@ campus-repair-system/
 | --- | --- | --- | --- |
 | Tomcat 11 · 根上下文 `/` | IDEA/`startup.bat` 部署，`storage.mode=memory` | 99/99 通过 | 97/97 通过 |
 | Tomcat 11 · 非根上下文 `/campus_repair_system_war` | 同上（前端已做上下文自适应） | — | 97/97 通过 |
-| Tomcat 11 · MySQL 持久化 | 同上，`storage.mode=jdbc` | — | 97/97 通过（本次交付前使用内置验证入口测得） |
+| **Tomcat 11 + MyBatis Mapper + MySQL**（当前部署形态） | `web.xml` 设 `storage.mode=mybatis` | 99/99 通过 | **97/97 通过**（`build/http-e2e.log`） |
+| MyBatis Mapper 层定点验证 | `test/.../MyBatisCheck.java`（在**部署目录的类路径**上运行） | **39/39 通过**（`build/mybatis-check.log`） | — |
 
-> 说明：从本版起项目只保留"IDEA + Tomcat"一种运行方式，原先用于演示的内置 HTTP 服务器启动类已移除；
-> 上表中"MySQL 持久化"一行的 97 项断言是在该启动类移除前测得的，被测代码为同一套 `ApiServlet` 之外
-> 的 Controller/Service/DAO（两种入口共用），MySQL 相关验证结论仍然有效。
+> 说明：项目运行方式为"IDEA + Tomcat"；MyBatis 一行是在 Tomcat + MySQL 真实环境下测得的，
+> 启动自检确认 `存储模式=mybatis，数据访问=MyBatis Mapper（resources/mapper/*.xml），
+> 数据库=OK: MySQL 8.0.25（MyBatis MySQL Connector/J 连接池）`。
+> 其中 `MyBatisCheck` 特意只把**部署目录**（`WEB-INF/classes` + `WEB-INF/lib/*.jar`）放进类路径运行，
+> 用于证明 MyBatis 配置确实随 WAR 一起部署生效，而不是靠源码目录里的 `src/main/resources` 兜底。
 
 ### 7.3 定点验证程序
 
 | 程序 | 用途 |
 | --- | --- |
-| `test/.../SelfTestRunner.java` | 主业务自测（99 项断言） |
+| `test/.../SelfTestRunner.java` | 主业务自测（99 项断言，容器无关的 Service/DAO 层） |
+| `test/.../MyBatisCheck.java` | **MyBatis Mapper 层定点验证（39 项断言）** |
 | `test/.../ParamMapTest.java` | 请求参数解析（JSON/表单/中文/数组） |
 | `test/.../DispatchCheck.java` | 智能派单得分与演示数据技能匹配核对 |
 | `test/.../CategoryTrace.java` | 报修单类别在「提交→审核→派单」链路上不被清空的回归验证 |
@@ -339,6 +371,19 @@ campus-repair-system/
    同类问题共 10 处（登录↔注册互跳、404 页返回按钮、侧边栏导航、列表里的详情/处理链接、
    登录成功后跳首页、注销后跳登录页）。已全部改为**相对路径**（`register.html`、`task.html?taskId=…` 等），
    配合页面顶部注入的 `<base>` 在任意上下文下都能正确解析；`App.url()` 也加了防重复拼接保护。
+12. **IDEA 打包 WAR 时丢掉 MyBatis 资源配置（"数据库连接失败"的直接原因）**：那次构建是**增量构建**
+   （JPS 日志为 `No changes found since last build`、`Affected build targets count: 0`），没有把
+   `src/main/resources` 拷进模块输出目录，于是 artifact 的 `WEB-INF/classes` 下只有 `com/`，
+   缺少 `mybatis-config.xml` 与 `mapper/*.xml`；`MyBatisSessionFactory.init()` 抛出
+   `MyBatis 配置加载失败：mybatis-config.xml`，而启动自检把它笼统归因为"数据库连接失败"，
+   让人误以为要去查数据库账号密码。已做两处修复：
+   （a）把运行资源镜像到 `webapp/WEB-INF/classes/`（`build.cmd` 每次编译自动同步）——IDEA 打包时
+   必定原样复制 Web 根，资源因此不再依赖增量构建是否拷贝了 `src/main/resources`；
+   （b）启动自检区分"配置未进入类路径"与"数据库连不上"两种失败，不再给出误导性提示。
+13. **两处只能跑一次的验证用例**：`MyBatisCheck` 用绝对值断言"派单后在单量 == 1、确认后 == 0"，
+   `http-e2e.ps1` 把资料修改用的手机号写死为 `13911110009`；只要这两个脚本在此之前跑过一次，
+   第二次就必然失败（分别表现为在单量不是 1、`该手机号已被其他账户使用`）。已分别改为按增量断言、
+   按运行时刻生成手机号，两个验证脚本现在都可重复执行。
 
 ---
 
@@ -356,7 +401,7 @@ campus-repair-system/
 | `src/servlet-adapter/java/.../CampusContextListener.java` | 读取 `web.xml` 上下文参数、初始化数据源、装载内存库演示数据、启动自检并打印可用账户数 |
 | `src/main/java/.../boot/DemoDataLoader.java` | 内存库演示数据（与 `db/seed.sql` 一致），由上面的监听器调用 |
 | `webapp/WEB-INF/web.xml` | 部署描述文件（servlet 映射、上下文参数、会话配置、JSP 视图保护） |
-| `webapp/WEB-INF/jsp/index.jsp`、`home.jsp` | JSP 视图层示例（登录页与工作台） |
+| `webapp/WEB-INF/classes/` | 运行资源镜像（`mybatis-config.xml`、`mapper/*.xml`、`config.properties`），随 Web 根一起打进 WAR |
 
 ### 8.2 部署步骤（IDEA + Tomcat 10/11，已实测通过）
 
@@ -365,18 +410,30 @@ campus-repair-system/
    - `Web resource directory` 指向项目内的 **`webapp`** 目录；
    - `Available Elements` 中把 **`campus-repair-system compile output`** 加入
      `WEB-INF/classes`；
-   - 把 **`lib/mysql-connector-j-8.3.0.jar`** 加入 `WEB-INF/lib`（jdbc 模式必需）。
+   - 把 `lib/` 下 **4 个 jar** 全部加入 `WEB-INF/lib`：
+     `mybatis-3.5.16.jar`、`mysql-connector-j-8.3.0.jar`、`slf4j-api-1.7.36.jar`、`slf4j-simple-1.7.36.jar`
+     （mybatis 模式下缺任何一个都会在启动自检里报错）。
+   - 其余无需手工添加：`webapp/WEB-INF/classes/` 下已带 `mybatis-config.xml`、`mapper/*.xml`
+     与 `config.properties`（由 `build.cmd` 从 `src/main/resources` 同步）。
 2. IDEA → `Run → Edit Configurations → Tomcat Server → Local`：
    - `Deployment` 标签页 `+` 选择上面的 artifact，**Application context 建议填 `/`**
      （填 `/campus_repair_system_war` 也能正常工作，前端已做上下文路径自适应）；
    - 确认 JDK 为 17 及以上（本项目已在 JDK 25 验证）。
 3. 启动后浏览器访问 `http://localhost:8080/`（根上下文）或
    `http://localhost:8080/<你的上下文>/`，用 `student / 123456` 登录。
-4. 启动日志（IDEA 控制台与 `logs/localhost.*.log`）会出现自检信息，务必确认这一行：
+4. 启动日志（IDEA 控制台与 `logs/localhost.*.log`）会出现自检信息，务必确认这一行的形态：
    ```
+   :: mybatis / jdbc 模式（已连上数据库）
+   [CampusRepair] 校园报修系统启动完成：存储模式=mybatis，数据访问=MyBatis Mapper（resources/mapper/*.xml），
+   数据库=OK: MySQL 8.0.25（MyBatis MySQL Connector/J 连接池），可用账户数=8
+
+   :: memory 模式
    [CampusRepair] 校园报修系统启动完成：存储模式=memory，数据库=（内存库模式，未连接数据库），可用账户数=8
    ```
-   `可用账户数` 为 0 表示**账号数据没准备好**，登录必然失败（详见 8.5 排查表）。
+   `可用账户数` 为 0 或负数、`数据库=FAILED…`，都表示**数据访问层没准备好**，登录必然失败：
+   - `FAILED: MyBatis 配置未进入类路径…` → 部署包的 `WEB-INF/classes` 下少了 `mybatis-config.xml` 或 `mapper/*.xml`
+     （累计执行一次 `build.cmd` 重新同步后再构建 artifact，详见 8.6 排查表）；
+   - `FAILED` 其他信息 → 数据库账号、库名或 MySQL 服务本身的问题。
 
 **命令行方式（不依赖 IDEA，可选）**
 
@@ -385,21 +442,77 @@ campus-repair-system/
 build.cmd
 
 :: 2) 组装部署目录（<APP> 为 Tomcat webapps 下的应用目录）
+::    webapp\* 已包含 WEB-INF\classes 下的 MyBatis 配置与 mapper，无需另拷
 xcopy /E /Y webapp\*              <APP>\
-xcopy /E /Y build\classes\*       <APP>\WEB-INF\classes\
-copy /Y lib\mysql-connector-j-8.3.0.jar <APP>\WEB-INF\lib\
+xcopy /E /Y build\classes\com     <APP>\WEB-INF\classes\com\
+copy /Y lib\*.jar                 <APP>\WEB-INF\lib\
 
 :: 3) 启动
 set JAVA_HOME=D:\Java
 <Tomcat>\bin\startup.bat
 ```
 
-### 8.3 配置项与生效位置
+### 8.3 数据访问层：MyBatis Mapper（设计书 2.2.6 的 MyBatis 实现）
+
+**存储模式（`storage.mode`）**
+
+| 取值 | 数据访问实现 | 用途 |
+| --- | --- | --- |
+| `mybatis`（**默认/正式部署**） | `dao/mybatis/MyBatisXxxDaoImpl` + `resources/mapper/*.xml` | MyBatis Mapper + MySQL，SQL 集中管理 |
+| `jdbc` | `dao/jdbc/JdbcXxxDaoImpl`（手写 SQL） | 对照实现，便于比较两种写法 |
+| `memory` | `dao/memory/MemoryXxxDaoImpl` | 无数据库演示（内置演示数据） |
+
+**文件构成**
+
+| 位置 | 内容 |
+| --- | --- |
+| `src/main/resources/mybatis-config.xml` | 全局配置：POOLED 数据源（连接参数来自 `db.*`）、JDBC 事务、10 个 Mapper 注册、类型别名 |
+| `src/main/resources/mapper/*.xml` | 10 个 Mapper XML，共 **99 条映射语句**（`select`/`insert`/`update`/`delete`） |
+| `src/main/java/.../dao/mapper/*.java` | 10 个 Mapper 接口 + `RepairOrderQuery`（分页查询入参对象） |
+| `src/main/java/.../dao/mybatis/MyBatisSessionFactory.java` | SqlSessionFactory 初始化、SqlSession 获取、**事务 begin/commit/rollback**、连接自检 |
+| `src/main/java/.../dao/mybatis/MyBatisDaoSupport.java` | DAO 公共基类：`query()` / `mutate()` 包装会话与自动提交 |
+| `src/main/java/.../dao/mybatis/MyBatisXxxDaoImpl.java` | 10 个 DAO 实现：仅「取 Mapper → 调方法 → 转换返回值」，**不含任何 SQL 字符串** |
+| `src/main/java/.../dal/MyBatisCapabilityProbe.java` | 自检工具：报告实际使用的 DAO 实现类与已注册 Mapper |
+
+**与设计书对应的关键语句**
+
+- `RepairOrderMapper.findByCondition / countByCondition`：对应设计书 2.2.3.2 的
+  `findByCondition()` 按条件分页查询，条件用 `<where>` + `<if>` 动态拼接，分页用 `LIMIT/OFFSET`；
+  查询通过 LEFT JOIN 一次性带出报修人、当前有效维修任务、维修人员与评价信息。
+- `RepairOrderMapper.updateSelective`：局部更新（仅覆盖非空字段），
+  保证"审核只调整优先级"不会清空类别/地点/描述等其他业务字段。
+- `MaterialMapper.deductStock`：条件更新 `SET stock = stock - ? WHERE mat_id = ? AND stock >= ?`，
+  库存不足时影响 0 行，由 Service 抛出"库存不足"业务异常，并发下不会出现负库存。
+- `RepairTaskMapper.countActiveByWorker`、`EvaluationMapper.avgScore` 等聚合语句支撑统计模块。
+- 事务：`MyBatisSessionFactory.begin/commit/rollback` 配合 `TxTemplate`，
+  使「保存维修结果 + 扣减库存 + 写入耗材使用记录 + 更新报修单状态」在同一 SqlSession 事务内完成
+  （满足设计书"库存扣减与耗材使用记录的写入需在同一个事务中完成"）。
+
+**部署所需 jar（放入 `WEB-INF/lib`）**
+
+```
+mybatis-3.5.16.jar        MyBatis 核心
+mysql-connector-j-8.3.0.jar  MySQL 驱动
+slf4j-api-1.7.36.jar      MyBatis 日志 API
+slf4j-simple-1.7.36.jar   简易日志实现（可选，便于在控制台看到执行的 SQL）
+```
+
+> 说明：`src` 全量编译（含 MyBatis 实现）需要这些 jar 在 classpath 上，
+> `scripts/build.ps1` 会自动把 `lib/*.jar` 加入编译与运行 classpath。
+
+**启动自检会明确报告实际生效的实现**，例如：
+
+```
+[CampusRepair] 校园报修系统启动完成：存储模式=mybatis，数据访问=MyBatis Mapper（resources/mapper/*.xml），
+数据库=OK: MySQL 8.0.25（MyBatis MySQL Connector/J 连接池），可用账户数=8
+```
+
+### 8.4 配置项与生效位置
 
 | 配置项 | 取值位置（Tomcat 部署） | 说明 |
 | --- | --- | --- |
-| `storage.mode` | `WEB-INF/web.xml` 的 `context-param`（默认 `memory`） | `memory` 内存库演示 / `jdbc` MySQL 持久化 |
-| `db.url` / `db.username` / `db.password` | `WEB-INF/web.xml` 的 `context-param` | jdbc 模式必填 |
+| `storage.mode` | `WEB-INF/web.xml` 的 `context-param`（当前为 `mybatis`） | `mybatis` / `jdbc` / `memory` |
+| `db.url` / `db.username` / `db.password` | `WEB-INF/web.xml` 的 `context-param` | MyBatis 数据源连接参数 |
 | `dispatch.acceptDeadlineMinutes` | `WEB-INF/web.xml` 的 `context-param` | 接单时限（表 1.8：2 小时） |
 | `order.confirmDeadlineHours` | `WEB-INF/web.xml` 的 `context-param` | 结果确认时限（表 1.9：24 小时） |
 | 监听端口 / 上下文路径 | Tomcat 的 `conf/server.xml` 与 IDEA 的运行配置 | 与本项目配置无关 |
@@ -415,22 +528,26 @@ set CAMPUS_DB_PASSWORD=你的密码
 
 （环境变量名规则：`CAMPUS_` + 配置项大写并把 `.` 换成 `_`，例如 `db.password` → `CAMPUS_DB_PASSWORD`。）
 
-### 8.4 扩展点
+### 8.5 扩展点
 
-- **替换数据访问框架**：`dao/` 下 10 个 DAO 接口可换为 MyBatis Mapper 或 JPA 实现，
-  只需在 `DaoFactory` 中切换实现类，Service 层无需改动（设计书 1.2 可维护性要求）。
+- **替换数据访问框架**：`dao/` 下 10 个 DAO 接口已有 MyBatis、手写 SQL、内存三套实现，
+  只需改 `storage.mode` 或在 `DaoFactory` 中切换实现类，Service 层无需改动
+  （设计书 1.2 可维护性要求）。新增实体只需补 Mapper 接口 + Mapper XML，并在
+  `mybatis-config.xml` 的 `<mappers>` 中注册。
 - **替换会话存储**：`web/SessionManager` 可改为 Redis 实现，支持多实例部署。
 - **新增功能模块**：新增 `XxxController` + `@Route` 注解方法即可自动注册路由，
   无需修改 `Dispatcher`。
 
-### 8.5 部署排查表（"点了没反应"逐项对照）
+### 8.6 部署排查表（"点了没反应"逐项对照）
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
 | 登录页能打开，点「登录」无任何反应（右上角仅有短暂红色提示） | 接口请求 404，`/api/*` 未部署或路径不对 | 确认 `WEB-INF/classes` 下有 `com/campus/repair/web/servlet/ApiServlet.class`；打开浏览器 F12 → Network，看 `/api/account/login` 的状态码与响应体 |
 | 接口返回 `{"code":1005,"message":"接口不存在：/应用上下文/api/..."}` | 上下文路径未被剥离（旧版本缺陷，已修复） | 使用当前版本代码；`ApiServlet` 已按 `request.getContextPath()` 剥离前缀 |
 | 接口返回 `{"code":1002,"message":"用户名或密码错误"}` | 账号数据源为空：内存库演示数据未装载，或 jdbc 模式未执行建库脚本 / 库密码不对 | 看启动自检日志的 `可用账户数`；为 0 时：改用 `storage.mode=memory` 快速验证，或执行 `db/schema.sql` + `db/seed.sql` 并核对 `db.password` |
-| 启动日志出现 `[错误] 数据库连接失败…` | `db.url/db.username/db.password` 与本机 MySQL 不一致 | 修正 `web.xml` 的 context-param，或设置环境变量 `CAMPUS_DB_PASSWORD` |
+| 启动日志出现 `数据库=FAILED: MyBatis 配置未进入类路径…`，后跟一条 `[错误] 数据库连接失败…` | MyBatis 的 XML 配置没被打进 WAR：`WEB-INF/classes` 下缺 `mybatis-config.xml` 或 `mapper/*.xml`（IDEA 增量构建没拷贝 `src/main/resources` 时会出现） | 与数据库账号密码无关。执行一次 `build.cmd`（会把 `src/main/resources` 同步到 `webapp/WEB-INF/classes`），确认该目录下有 `mybatis-config.xml` 与 `mapper/` 后再重新构建 artifact 并重启 |
+| 启动日志出现 `数据库=FAILED: …` 且提示的是连接或认证失败 | `db.url/db.username/db.password` 与本机 MySQL 不一致 | 修正 `web.xml` 的 context-param，或设置环境变量 `CAMPUS_DB_PASSWORD` |
+| `数据库=OK` 但 `可用账户数=0`（或为负数） | 建库脚本没执行，或连到了另一个空库 | 执行 `db/schema.sql` + `db/seed.sql`，并核对 `db.url` 中的库名 |
 | 接口返回 500 且日志有 `ClassNotFoundException: com.mysql.cj.jdbc.Driver` | `WEB-INF/lib` 缺少 MySQL 驱动 | 把 `lib/mysql-connector-j-8.3.0.jar` 复制进 `WEB-INF/lib` |
 | 登录成功但后续接口返回 `1003 登录状态已失效` | 浏览器同时携带两个同名 `CRS_TOKEN` Cookie（旧版本以 `path=/` 写入所致） | 使用当前版本（Cookie 按上下文路径写入，且服务端会挑选有效令牌）；清一次浏览器 Cookie 即可 |
 | 应用启动失败，日志提示 servlet 映射冲突 | 同一 Tomcat 中其他应用（如 `SecondPractice_041_war`）自身配置有误，与本项目无关 | 在 IDEA 的 Tomcat 配置中移除该应用的 Deployment，或单独为它排查 |

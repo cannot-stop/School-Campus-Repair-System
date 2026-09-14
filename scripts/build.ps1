@@ -67,12 +67,27 @@ function Resolve-TomcatHome {
 }
 
 $tomcatHome = Resolve-TomcatHome
-$compileClassPath = ""
+$classPathParts = @()
 if ($tomcatHome) {
-    $compileClassPath = (Join-Path $tomcatHome "lib\servlet-api.jar") + ";" + (Join-Path $tomcatHome "lib\jsp-api.jar")
+    $classPathParts += (Join-Path $tomcatHome "lib\servlet-api.jar")
+    $classPathParts += (Join-Path $tomcatHome "lib\jsp-api.jar")
     Write-Host "[构建] Tomcat: $tomcatHome（已加入 servlet-api/jsp-api，用于编译 Servlet 适配层）" -ForegroundColor Cyan
 } else {
     Write-Host "[构建] 未找到 Tomcat（可用 CATALINA_HOME 指定）；本次仅编译主程序，跳过 Servlet 适配层" -ForegroundColor Yellow
+}
+
+# 第三方依赖（MyBatis、MySQL 驱动、slf4j）统一从 lib 目录获取
+$libDir = Join-Path $root "lib"
+if (Test-Path $libDir) {
+    $libJars = Get-ChildItem -Path $libDir -Filter *.jar | Select-Object -ExpandProperty FullName
+    if ($libJars.Count -gt 0) {
+        $classPathParts += $libJars
+        Write-Host ("[构建] lib 依赖 " + $libJars.Count + " 个：" + (($libJars | ForEach-Object { Split-Path $_ -Leaf }) -join "、")) -ForegroundColor Cyan
+    }
+}
+$compileClassPath = ($classPathParts -join ";")
+if (-not ($libJars | Where-Object { $_ -like "*mybatis*" })) {
+    Write-Host "[构建] 警告：lib 下未找到 mybatis 依赖，MyBatis Mapper 相关代码将编译失败" -ForegroundColor Yellow
 }
 
 New-Item -ItemType Directory -Force -Path $classesDir | Out-Null
@@ -107,6 +122,15 @@ try {
     if (Test-Path $resourceDir) {
         Copy-Item -Path (Join-Path $resourceDir "*") -Destination $classesDir -Recurse -Force
         Write-Host "[构建] 已复制运行资源（config.properties 等）到 build\classes" -ForegroundColor Cyan
+
+        # 同步一份到 Web 根：IDEA 打包 artifact 时把 webapp/ 目录原样复制进 WAR，
+        # 所以 mybatis-config.xml、mapper/*.xml 只有放在 webapp\WEB-INF\classes 下，
+        # 才能保证部署后一定位于类路径上（不依赖 IDEA 是否拷贝 src/main/resources）。
+        $webClassesDir = Join-Path $root "webapp\WEB-INF\classes"
+        New-Item -ItemType Directory -Force -Path $webClassesDir | Out-Null
+        Copy-Item -Path (Join-Path $resourceDir "*") -Destination $webClassesDir -Recurse -Force
+        $mirrored = @(Get-ChildItem -Path $webClassesDir -Recurse -File).Count
+        Write-Host ("[构建] 已同步运行资源到 webapp\WEB-INF\classes（" + $mirrored + " 个文件，供 IDEA 打包 WAR 使用）") -ForegroundColor Cyan
     }
 
     if ($WithSelfTest) {

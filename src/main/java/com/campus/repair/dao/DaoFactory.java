@@ -33,13 +33,16 @@ public final class DaoFactory {
         if (mode != null) {
             return;
         }
-        mode = AppConfig.get("storage.mode", "memory").toLowerCase();
-        if (!"memory".equals(mode)) {
-            mode = "jdbc";
+        String configured = AppConfig.get("storage.mode", "mybatis").toLowerCase();
+        if ("memory".equals(configured) || "jdbc".equals(configured) || "mybatis".equals(configured)) {
+            mode = configured;
+        } else {
+            // 兼容旧配置值（hibernate / spring-jdbc 等）统一按 MyBatis 处理
+            mode = "mybatis";
         }
     }
 
-    /** 当前存储模式 */
+    /** 当前存储模式：memory（内存库演示）/ mybatis（MyBatis + MySQL）/ jdbc（手写 SQL + MySQL） */
     public static String mode() {
         init();
         return mode;
@@ -50,22 +53,39 @@ public final class DaoFactory {
         return "memory".equals(mode());
     }
 
-    /** 是否使用 MySQL（JDBC）持久化 */
+    /** 是否使用 MyBatis（正式部署的默认持久化方式） */
+    public static boolean isMyBatisMode() {
+        return "mybatis".equals(mode());
+    }
+
+    /** 是否使用手写 SQL 的 JDBC 实现（保留作为等价实现） */
     public static boolean isJdbcMode() {
         return "jdbc".equals(mode());
     }
 
+    /** 是否使用数据库持久化（MyBatis 或 JDBC），事务需要真实数据库连接 */
+    public static boolean isDatabaseMode() {
+        return !isMemoryMode();
+    }
+
     /**
      * 按接口名反射创建实现类。
-     * 接口 UserDao → 内存模式 MemoryUserDaoImpl / JDBC 模式 JdbcUserDaoImpl。
+     * 接口 UserDao → memory 模式 {@code MemoryUserDaoImpl}；
+     * mybatis 模式 {@code MyBatisUserDaoImpl}；jdbc 模式 {@code JdbcUserDaoImpl}。
      */
     private static Object create(Class<?> type) {
         init();
         String simple = type.getSimpleName();
         String base = simple.endsWith("Dao") ? simple.substring(0, simple.length() - 3) : simple;
-        String className = (isMemoryMode()
-                ? "com.campus.repair.dao.memory.Memory"
-                : "com.campus.repair.dao.jdbc.Jdbc") + base + "DaoImpl";
+        String prefix;
+        if (isMemoryMode()) {
+            prefix = "com.campus.repair.dao.memory.Memory";
+        } else if (isMyBatisMode()) {
+            prefix = "com.campus.repair.dao.mybatis.MyBatis";
+        } else {
+            prefix = "com.campus.repair.dao.jdbc.Jdbc";
+        }
+        String className = prefix + base + "DaoImpl";
         try {
             Class<?> clazz = Class.forName(className);
             return clazz.getDeclaredConstructor().newInstance();

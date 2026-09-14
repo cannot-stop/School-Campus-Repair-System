@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- ============================================================================
+     用户 Mapper（对应设计书表 2.10 t_user 与 2.2.6 UserDao）
+     ============================================================================ -->
+<mapper namespace="com.campus.repair.dao.mapper.UserMapper">
+
+    <resultMap id="UserMap" type="com.campus.repair.domain.User">
+        <id     property="userId"      column="user_id"/>
+        <result property="username"    column="username"/>
+        <result property="password"    column="password"/>
+        <result property="realName"    column="real_name"/>
+        <result property="studentNo"   column="student_no"/>
+        <result property="phone"       column="phone"/>
+        <result property="role"        column="role"/>
+        <result property="auditStatus" column="audit_status"/>
+        <result property="isLocked"    column="is_locked"/>
+        <result property="createTime"  column="create_time"/>
+    </resultMap>
+
+    <sql id="columns">
+        user_id, username, password, real_name, student_no, phone, role, audit_status, is_locked, create_time
+    </sql>
+
+    <insert id="insert" parameterType="com.campus.repair.domain.User"
+            useGeneratedKeys="true" keyProperty="userId" keyColumn="user_id">
+        INSERT INTO t_user (username, password, real_name, student_no, phone, role, audit_status, is_locked, create_time)
+        VALUES (#{username}, #{password}, #{realName}, #{studentNo}, #{phone}, #{role},
+                #{auditStatus}, #{isLocked}, #{createTime})
+    </insert>
+
+    <update id="update" parameterType="com.campus.repair.domain.User">
+        UPDATE t_user
+           SET real_name = #{realName}, student_no = #{studentNo}, phone = #{phone}, role = #{role}
+         WHERE user_id = #{userId}
+    </update>
+
+    <update id="updatePassword">
+        UPDATE t_user SET password = #{password} WHERE user_id = #{userId}
+    </update>
+
+    <update id="updateAuditStatus">
+        UPDATE t_user SET audit_status = #{auditStatus} WHERE user_id = #{userId}
+    </update>
+
+    <update id="updateLocked">
+        UPDATE t_user SET is_locked = #{isLocked} WHERE user_id = #{userId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM t_user WHERE user_id = #{userId}
+    </delete>
+
+    <select id="findById" resultMap="UserMap">
+        SELECT <include refid="columns"/> FROM t_user WHERE user_id = #{userId}
+    </select>
+
+    <select id="findByUsername" resultMap="UserMap">
+        SELECT <include refid="columns"/> FROM t_user WHERE username = #{username}
+    </select>
+
+    <select id="findByPhone" resultMap="UserMap">
+        SELECT <include refid="columns"/> FROM t_user WHERE phone = #{phone}
+    </select>
+
+    <select id="findByStudentNo" resultMap="UserMap">
+        SELECT <include refid="columns"/> FROM t_user WHERE student_no = #{studentNo}
+    </select>
+
+    <select id="findByRole" resultMap="UserMap">
+        SELECT <include refid="columns"/> FROM t_user WHERE role = #{role} ORDER BY user_id DESC
+    </select>
+
+    <select id="findByAuditStatus" resultMap="UserMap">
+        SELECT <include refid="columns"/> FROM t_user WHERE audit_status = #{auditStatus}
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="findAll" resultMap="UserMap">
+        SELECT <include refid="columns"/> FROM t_user ORDER BY user_id
+    </select>
+
+    <select id="countByRole" resultType="long">
+        SELECT COUNT(*) FROM t_user WHERE role = #{role}
+    </select>
+
+</mapper>
