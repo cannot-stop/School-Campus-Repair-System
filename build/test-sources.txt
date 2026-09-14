@@ -1,0 +1,6 @@
+src/test/java/com/campus/repair/test/CategoryTrace.java
+src/test/java/com/campus/repair/test/ConfigProbe.java
+src/test/java/com/campus/repair/test/DispatchCheck.java
+src/test/java/com/campus/repair/test/JdbcFlowCheck.java
+src/test/java/com/campus/repair/test/ParamMapTest.java
+src/test/java/com/campus/repair/test/SelfTestRunner.java

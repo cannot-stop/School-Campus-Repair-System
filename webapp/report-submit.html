@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+        /* 上下文路径引导：兼容 Tomcat 部署在 /app 等非根上下文的情况。
+           在解析本页相对资源之前执行，把应用根路径写入 <base> 与 window.__CRS_BASE__。 */
+        (function () {
+            var p = location.pathname || '/';
+            var i = p.lastIndexOf('/');
+            var basePath = (i > 0 && p.substring(i + 1).indexOf('.') >= 0) ? p.substring(0, i + 1) : p;
+            if (basePath.charAt(basePath.length - 1) !== '/') { basePath += '/'; }
+            var base = document.createElement('base');
+            base.href = location.origin + basePath;
+            document.head.insertBefore(base, document.head.firstChild);
+            window.__CRS_BASE__ = basePath.replace(/\/+$/, '');
+        })();
+    </script>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园报修系统 · 提交报修</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside id="sidebar"></aside>
+    <div class="main">
+        <div class="topbar" id="topbar"></div>
+        <div class="content">
+            <div class="detail-grid">
+                <div class="card">
+                    <div class="card-head"><h3>填写报修信息</h3></div>
+                    <div class="card-body">
+                        <div id="alert" class="alert alert-info">
+                            请如实填写报修地点与故障情况；提交后由维修管理员审核，审核通过后进入派单流程。
+                        </div>
+                        <form id="reportForm" class="form">
+                            <label>报修楼栋 *<select name="building" id="building"></select></label>
+                            <label>楼层 *<input type="text" name="floor" placeholder="如 3 或 3层"></label>
+                            <label>房间号 *<input type="text" name="room" placeholder="如 308"></label>
+                            <label>报修类别 *<select name="category" id="category"></select></label>
+                            <label>紧急程度
+                                <select name="priority">
+                                    <option value="0">普通（按顺序处理）</option>
+                                    <option value="1">紧急（影响教学或安全）</option>
+                                </select>
+                            </label>
+                            <label>故障描述 *<textarea name="description" placeholder="请描述故障现象、影响范围等，便于维修人员判断"></textarea></label>
+                            <label>现场照片 URL（可选，多个 URL 用英文逗号分隔）
+                                <input type="text" name="images" placeholder="如 /uploads/a.jpg,/uploads/b.jpg">
+                            </label>
+                            <div style="display:flex;gap:10px">
+                                <button type="submit" class="btn btn-primary">提交报修</button>
+                                <button type="reset" class="btn btn-ghost">重置</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-head"><h3>我的待处理报修单</h3></div>
+                    <div class="card-body">
+                        <div style="overflow-x:auto">
+                            <table class="table table-compact">
+                                <thead><tr><th>单号</th><th>地点</th><th>状态</th><th>提交时间</th></tr></thead>
+                                <tbody id="pendingBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="js/common.js"></script>
+<script src="js/report-submit.js"></script>
+</body>
+</html>

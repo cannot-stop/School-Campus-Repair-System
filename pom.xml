@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================
+   校园报修系统 · Maven 构建配置（可选）
+   说明：
+     1. 本系统默认使用「纯 JDK + 无第三方依赖」方式构建与运行，命令为：
+            build.cmd            （PowerShell 脚本，无需 Maven 与联网）
+            run.cmd 8080 jdbc    （jdbc 模式需将 mysql-connector-j 放入 lib/）
+     2. 若需要打成 WAR 部署到 Tomcat 10+，或使用 Spring/MyBatis 版本依赖，
+        可使用本 POM（需可访问 Maven 中央仓库）：
+            mvn clean package -DskipTests
+        target/campus-repair-system.war 可部署到 Tomcat 10.x（Jakarta EE 9+）。
+     3. 源码布局：src/main/java（业务代码）、src/servlet-adapter/java（Servlet 适配层）、
+        src/main/resources（配置）、webapp（前端资源与 web.xml）。
+  ============================================================================
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.campus</groupId>
+    <artifactId>campus-repair-system</artifactId>
+    <version>1.0.0</version>
+    <packaging>war</packaging>
+    <name>校园报修系统</name>
+    <description>依据《校园报修系统需求分析和系统详细设计书》实现的校园报修系统（MVC 分层架构）</description>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <dependencies>
+        <!-- Servlet 容器提供，编译期依赖 -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.servlet.jsp</groupId>
+            <artifactId>jakarta.servlet.jsp-api</artifactId>
+            <version>3.1.1</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- MySQL 驱动（JDBC 持久化模式必需） -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>8.3.0</version>
+        </dependency>
+
+        <!-- 若采用设计书提到的 MyBatis 作为数据访问框架，可启用以下依赖，
+             并将 storage.mode 保持为 jdbc（当前实现为等价的 JDBC 手写 SQL 版本） -->
+        <!--
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis</artifactId>
+            <version>3.5.15</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis-spring</artifactId>
+            <version>3.0.3</version>
+        </dependency>
+        -->
+    </dependencies>
+
+    <build>
+        <finalName>campus-repair-system</finalName>
+        <!-- 前端资源目录统一使用 webapp/（内置服务器与 WAR 共用同一份资源，避免维护两份副本） -->
+        <plugins>
+            <!-- 将 Servlet 适配层源码加入编译路径 -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>add-servlet-adapter-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>src/servlet-adapter/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.4.0</version>
+                <configuration>
+                    <warSourceDirectory>webapp</warSourceDirectory>
+                    <failOnMissingWebXml>false</failOnMissingWebXml>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

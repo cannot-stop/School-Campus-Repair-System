@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+        /* 上下文路径引导：兼容 Tomcat 部署在 /app 等非根上下文的情况。
+           在解析本页相对资源之前执行，把应用根路径写入 <base> 与 window.__CRS_BASE__。 */
+        (function () {
+            var p = location.pathname || '/';
+            var i = p.lastIndexOf('/');
+            var basePath = (i > 0 && p.substring(i + 1).indexOf('.') >= 0) ? p.substring(0, i + 1) : p;
+            if (basePath.charAt(basePath.length - 1) !== '/') { basePath += '/'; }
+            var base = document.createElement('base');
+            base.href = location.origin + basePath;
+            document.head.insertBefore(base, document.head.firstChild);
+            window.__CRS_BASE__ = basePath.replace(/\/+$/, '');
+        })();
+    </script>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园报修系统 · 统计分析</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside id="sidebar"></aside>
+    <div class="main">
+        <div class="topbar" id="topbar"></div>
+        <div class="content">
+            <div class="stat-grid" id="statGrid"></div>
+
+            <div class="detail-grid">
+                <div class="card">
+                    <div class="card-head"><h3>故障类型分析（按报修类别）</h3></div>
+                    <div class="card-body"><table class="table table-compact">
+                        <thead><tr><th>类别</th><th>报修量</th><th>已完成</th><th>完成率(%)</th></tr></thead>
+                        <tbody id="categoryBody"></tbody>
+                    </table></div>
+                </div>
+                <div class="card">
+                    <div class="card-head"><h3>楼栋分布分析</h3></div>
+                    <div class="card-body"><table class="table table-compact">
+                        <thead><tr><th>楼栋</th><th>报修量</th><th>已完成</th><th>完成率(%)</th></tr></thead>
+                        <tbody id="buildingBody"></tbody>
+                    </table></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h3>维修人员绩效统计</h3></div>
+                <div class="card-body">
+                    <div style="overflow-x:auto">
+                        <table class="table">
+                            <thead><tr><th>维修人员</th><th>派单量</th><th>已完成</th><th>进行中</th><th>完成率(%)</th><th>平均处理时长(小时)</th><th>平均评分</th><th>耗材成本(元)</th></tr></thead>
+                            <tbody id="workerBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-grid">
+                <div class="card">
+                    <div class="card-head"><h3>月度报修趋势</h3></div>
+                    <div class="card-body"><table class="table table-compact">
+                        <thead><tr><th>月份</th><th>报修量</th><th>已完成</th><th>完成率(%)</th></tr></thead>
+                        <tbody id="monthlyBody"></tbody>
+                    </table></div>
+                </div>
+                <div class="card">
+                    <div class="card-head"><h3>耗材消耗排行</h3></div>
+                    <div class="card-body"><table class="table table-compact">
+                        <thead><tr><th>耗材</th><th>使用数量</th><th>成本(元)</th></tr></thead>
+                        <tbody id="materialBody"></tbody>
+                    </table></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h3>报修单状态分布</h3></div>
+                <div class="card-body"><table class="table table-compact">
+                    <thead><tr><th>状态</th><th>数量</th></tr></thead>
+                    <tbody id="statusBody"></tbody>
+                </table></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="js/common.js"></script>
+<script src="js/statistics.js"></script>
+</body>
+</html>

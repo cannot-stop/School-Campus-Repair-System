@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  校园报修系统 · Web 容器部署描述文件
+  适用容器：Tomcat 10.x / Jetty 11+（Jakarta EE 9+，命名空间 jakarta.servlet）
+
+  说明：系统默认使用 JDK 内置服务器运行（com.campus.repair.boot.CampusRepairApplication），
+        本文件用于将同一套 Controller/Service/DAO 部署到标准 Servlet 容器。
+        前端静态页面位于 webapp/ 目录，可直接作为 Web 根资源；JSP 视图位于 webapp/WEB-INF/jsp/。
+-->
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+                             https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0">
+
+    <display-name>校园报修系统</display-name>
+    <description>依据《校园报修系统需求分析和系统详细设计书》实现，采用 MVC 分层架构</description>
+
+    <!-- ============================ 上下文参数 ============================
+         说明：这里的取值会作为系统属性注入，优先级高于 classpath 下的 config.properties；
+               环境变量优先级最高（如 CAMPUS_DB_PASSWORD 可覆盖下面的 db.password）。
+
+         storage.mode：
+           memory  —— 内存库演示模式，无需数据库即可登录（内置演示账号）
+           jdbc    —— MySQL 持久化模式，需先执行 db/schema.sql 与 db/seed.sql
+    -->
+    <context-param>
+        <param-name>storage.mode</param-name>
+        <param-value>memory</param-value>
+    </context-param>
+    <context-param>
+        <param-name>db.driver</param-name>
+        <param-value>com.mysql.cj.jdbc.Driver</param-value>
+    </context-param>
+    <context-param>
+        <param-name>db.url</param-name>
+        <param-value>jdbc:mysql://127.0.0.1:3306/campus_repair?useUnicode=true&amp;characterEncoding=utf8&amp;serverTimezone=Asia/Shanghai&amp;useSSL=false&amp;allowPublicKeyRetrieval=true</param-value>
+    </context-param>
+    <context-param>
+        <param-name>db.username</param-name>
+        <param-value>root</param-value>
+    </context-param>
+    <!-- 数据库密码：请按本机 MySQL 实际密码修改，或设置环境变量 CAMPUS_DB_PASSWORD（推荐，避免明文入库） -->
+    <context-param>
+        <param-name>db.password</param-name>
+        <param-value>123456</param-value>
+    </context-param>
+
+    <!-- ============================ 监听器 ============================ -->
+    <listener>
+        <listener-class>com.campus.repair.web.servlet.CampusContextListener</listener-class>
+    </listener>
+
+    <!-- ============================ 前端控制器 ============================ -->
+    <!-- /api/* 由 ApiServlet 统一处理：路由匹配、参数封装、会话鉴权、结果渲染 -->
+    <servlet>
+        <servlet-name>apiServlet</servlet-name>
+        <servlet-class>com.campus.repair.web.servlet.ApiServlet</servlet-class>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>apiServlet</servlet-name>
+        <url-pattern>/api/*</url-pattern>
+    </servlet-mapping>
+
+    <!-- ============================ 会话配置 ============================ -->
+    <session-config>
+        <session-timeout>120</session-timeout>
+        <cookie-config>
+            <name>CRS_TOKEN</name>
+            <http-only>true</http-only>
+        </cookie-config>
+    </session-config>
+
+    <!-- ============================ 视图（JSP）============================ -->
+    <welcome-file-list>
+        <welcome-file>index.html</welcome-file>
+        <welcome-file>index.jsp</welcome-file>
+    </welcome-file-list>
+
+    <jsp-config>
+        <jsp-property-group>
+            <url-pattern>*.jsp</url-pattern>
+            <page-encoding>UTF-8</page-encoding>
+            <trim-directive-whitespaces>true</trim-directive-whitespaces>
+        </jsp-property-group>
+    </jsp-config>
+
+    <!-- ====================== JSP 视图目录保护 ======================
+         视图统一放在 WEB-INF/jsp 下，禁止直接访问；外部通过 /forward.jsp?view=xxx
+         或 *.jsp 入口转发加载（见 src/main/webapp/forward.jsp 白名单）。 -->
+    <security-constraint>
+        <web-resource-collection>
+            <web-resource-name>JSP 视图目录保护</web-resource-name>
+            <url-pattern>/WEB-INF/jsp/*</url-pattern>
+        </web-resource-collection>
+        <auth-constraint/>
+    </security-constraint>
+
+    <error-page>
+        <error-code>404</error-code>
+        <location>/404.html</location>
+    </error-page>
+
+</web-app>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+        /* 上下文路径引导：兼容 Tomcat 部署在 /app 等非根上下文的情况。
+           在解析本页相对资源之前执行，把应用根路径写入 <base> 与 window.__CRS_BASE__。 */
+        (function () {
+            var p = location.pathname || '/';
+            var i = p.lastIndexOf('/');
+            var basePath = (i > 0 && p.substring(i + 1).indexOf('.') >= 0) ? p.substring(0, i + 1) : p;
+            if (basePath.charAt(basePath.length - 1) !== '/') { basePath += '/'; }
+            var base = document.createElement('base');
+            base.href = location.origin + basePath;
+            document.head.insertBefore(base, document.head.firstChild);
+            window.__CRS_BASE__ = basePath.replace(/\/+$/, '');
+        })();
+    </script>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园报修系统 · 消息通知</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside id="sidebar"></aside>
+    <div class="main">
+        <div class="topbar" id="topbar"></div>
+        <div class="content">
+            <div class="card">
+                <div class="card-head">
+                    <h3>消息通知</h3>
+                    <button class="btn btn-ghost btn-sm" id="btnReadAll">全部标记已读</button>
+                </div>
+                <div class="card-body">
+                    <div style="overflow-x:auto">
+                        <table class="table">
+                            <thead><tr><th style="width:80px">类型</th><th>内容</th><th style="width:170px">推送时间</th><th style="width:110px">状态</th><th style="width:90px">操作</th></tr></thead>
+                            <tbody id="listBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="js/common.js"></script>
+<script>
+    (function () {
+        var me = App.shell({ key: 'messages', title: '消息通知' });
+        if (!me) { return; }
+
+        document.getElementById('btnReadAll').onclick = function () {
+            App.api('/api/message/readAll', {}).done(function (count, message) {
+                App.toast(message, 'success');
+                load();
+            });
+        };
+
+        function load() {
+            App.api('/api/message/list', {}).done(function (data) {
+                App.renderRows('listBody', data.messages, function (row) {
+                    return '<tr' + (row.isRead === 1 ? '' : ' style="background:#f7fbff"') + '>' +
+                        '<td><span class="tag tag-blue">' + App.escapeHtml(row.msgType) + '</span></td>' +
+                        '<td>' + App.escapeHtml(row.content) + '</td>' +
+                        '<td>' + App.formatDate(row.createTime) + '</td>' +
+                        '<td>' + (row.isRead === 1 ? '<span class="tag tag-gray">已读</span>' : '<span class="tag tag-red">未读</span>') + '</td>' +
+                        '<td>' + (row.isRead === 1 ? '—' : '<button class="btn btn-sm btn-ghost act-read" data-id="' + row.msgId + '">标记已读</button>') + '</td>' +
+                        '</tr>';
+                }, 5);
+
+                App.$$('.act-read').forEach(function (btn) {
+                    btn.onclick = function () {
+                        App.api('/api/message/read', { msgId: btn.getAttribute('data-id') }).done(function () {
+                            load();
+                        });
+                    };
+                });
+            });
+        }
+
+        load();
+    })();
+</script>
+</body>
+</html>

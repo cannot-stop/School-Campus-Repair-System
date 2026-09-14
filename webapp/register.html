@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+        /* 上下文路径引导：兼容 Tomcat 部署在 /app 等非根上下文的情况。
+           在解析本页相对资源之前执行，把应用根路径写入 <base> 与 window.__CRS_BASE__。 */
+        (function () {
+            var p = location.pathname || '/';
+            var i = p.lastIndexOf('/');
+            var basePath = (i > 0 && p.substring(i + 1).indexOf('.') >= 0) ? p.substring(0, i + 1) : p;
+            if (basePath.charAt(basePath.length - 1) !== '/') { basePath += '/'; }
+            var base = document.createElement('base');
+            base.href = location.origin + basePath;
+            document.head.insertBefore(base, document.head.firstChild);
+            window.__CRS_BASE__ = basePath.replace(/\/+$/, '');
+        })();
+    </script>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园报修系统 · 注册</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-body">
+<div class="auth-wrap">
+    <div class="auth-hero">
+        <h1>账户注册</h1>
+        <p class="subtitle">注册后需经系统管理员实名审核，审核通过方可登录</p>
+        <ul class="hero-list">
+            <li>用户名、手机号、学号/工号均需唯一</li>
+            <li>密码使用加盐摘要存储，长度不少于 6 位且不能为纯数字</li>
+            <li>维修人员注册时需填写技能标签（如：水电,木工,设备）</li>
+        </ul>
+        <div class="hero-footer">
+            <a href="/index.html">← 返回登录</a>
+        </div>
+    </div>
+    <div class="auth-card">
+        <h2>填写注册信息</h2>
+        <div id="alert" class="alert hidden"></div>
+        <form id="registerForm" autocomplete="off">
+            <label>用户角色
+                <select name="role" id="roleSelect">
+                    <option value="reporter">报修人（学生 / 教职工）</option>
+                    <option value="worker">维修人员</option>
+                    <option value="manager">维修管理员</option>
+                </select>
+            </label>
+            <label>用户名<input type="text" name="username" placeholder="登录用户名" required></label>
+            <label>密码<input type="password" name="password" placeholder="至少 6 位，不能为纯数字" required></label>
+            <label>真实姓名<input type="text" name="realName" placeholder="用于实名审核" required></label>
+            <label>学号 / 工号<input type="text" name="studentNo" placeholder="如 2021010101 或 T20190101" required></label>
+            <label>手机号<input type="text" name="phone" placeholder="11 位手机号" required></label>
+            <label id="skillRow" class="hidden">技能标签
+                <input type="text" name="skillTags" placeholder="如：水电,木工,设备,门窗,网络">
+            </label>
+            <button type="submit" class="btn btn-primary btn-block">提交注册</button>
+        </form>
+    </div>
+</div>
+<script src="js/common.js"></script>
+<script src="js/register.js"></script>
+</body>
+</html>

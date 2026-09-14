@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+        /* 上下文路径引导：兼容 Tomcat 部署在 /app 等非根上下文的情况。
+           在解析本页相对资源之前执行，把应用根路径写入 <base> 与 window.__CRS_BASE__。 */
+        (function () {
+            var p = location.pathname || '/';
+            var i = p.lastIndexOf('/');
+            var basePath = (i > 0 && p.substring(i + 1).indexOf('.') >= 0) ? p.substring(0, i + 1) : p;
+            if (basePath.charAt(basePath.length - 1) !== '/') { basePath += '/'; }
+            var base = document.createElement('base');
+            base.href = location.origin + basePath;
+            document.head.insertBefore(base, document.head.firstChild);
+            window.__CRS_BASE__ = basePath.replace(/\/+$/, '');
+        })();
+    </script>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园报修系统 · 用户与审核</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside id="sidebar"></aside>
+    <div class="main">
+        <div class="topbar" id="topbar"></div>
+        <div class="content">
+            <div class="stat-grid" id="statGrid"></div>
+            <div class="card">
+                <div class="card-head">
+                    <h3>待审核账户</h3>
+                    <span class="muted">审核通过后账户方可登录；核实学号/工号与实名信息</span>
+                </div>
+                <div class="card-body">
+                    <div style="overflow-x:auto">
+                        <table class="table">
+                            <thead><tr><th>用户名</th><th>姓名</th><th>学号/工号</th><th>手机号</th><th>角色</th><th>注册时间</th><th>操作</th></tr></thead>
+                            <tbody id="pendingBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head">
+                    <h3>账户列表</h3>
+                    <label>按角色筛选
+                        <select id="fRole">
+                            <option value="">全部</option>
+                            <option value="reporter">报修人</option>
+                            <option value="worker">维修人员</option>
+                            <option value="manager">维修管理员</option>
+                            <option value="admin">系统管理员</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="card-body">
+                    <div style="overflow-x:auto">
+                        <table class="table">
+                            <thead><tr><th>ID</th><th>用户名</th><th>姓名</th><th>学号/工号</th><th>手机号</th><th>角色</th><th>审核状态</th><th>锁定</th><th>注册时间</th><th>操作</th></tr></thead>
+                            <tbody id="userBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="js/common.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

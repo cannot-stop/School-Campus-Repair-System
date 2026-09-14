@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+        /* 上下文路径引导：兼容 Tomcat 部署在 /app 等非根上下文的情况。
+           在解析本页相对资源之前执行，把应用根路径写入 <base> 与 window.__CRS_BASE__。 */
+        (function () {
+            var p = location.pathname || '/';
+            var i = p.lastIndexOf('/');
+            var basePath = (i > 0 && p.substring(i + 1).indexOf('.') >= 0) ? p.substring(0, i + 1) : p;
+            if (basePath.charAt(basePath.length - 1) !== '/') { basePath += '/'; }
+            var base = document.createElement('base');
+            base.href = location.origin + basePath;
+            document.head.insertBefore(base, document.head.firstChild);
+            window.__CRS_BASE__ = basePath.replace(/\/+$/, '');
+        })();
+    </script>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园报修系统 · 基础数据</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside id="sidebar"></aside>
+    <div class="main">
+        <div class="topbar" id="topbar"></div>
+        <div class="content">
+            <div class="card">
+                <div class="card-head"><h3>维护楼栋、报修类别与维修工种</h3></div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        报修时只能选择此处维护的楼栋与类别；维修工种的取值用于维修人员技能标签匹配（影响智能派单得分）。
+                    </div>
+                    <div class="filters">
+                        <label>数据类型
+                            <select id="fType">
+                                <option value="building">楼栋（building）</option>
+                                <option value="category">报修类别（category）</option>
+                                <option value="skill">维修工种（skill）</option>
+                            </select>
+                        </label>
+                        <label>数据值<input type="text" id="fValue" placeholder="如：3号教学楼"></label>
+                        <label>排序号<input type="number" id="fSort" value="100"></label>
+                        <button class="btn btn-primary" id="btnAdd">新增</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-head"><h3>当前数据</h3></div>
+                <div class="card-body" id="listBody">加载中…</div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="js/common.js"></script>
+<script src="js/base-data.js"></script>
+</body>
+</html>

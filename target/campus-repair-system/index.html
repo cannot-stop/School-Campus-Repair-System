@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+        /* 上下文路径引导：兼容 Tomcat 部署在 /app 等非根上下文的情况。
+           在解析本页相对资源之前执行，把应用根路径写入 <base> 与 window.__CRS_BASE__。 */
+        (function () {
+            var p = location.pathname || '/';
+            var i = p.lastIndexOf('/');
+            var basePath = (i > 0 && p.substring(i + 1).indexOf('.') >= 0) ? p.substring(0, i + 1) : p;
+            if (basePath.charAt(basePath.length - 1) !== '/') { basePath += '/'; }
+            var base = document.createElement('base');
+            base.href = location.origin + basePath;
+            document.head.insertBefore(base, document.head.firstChild);
+            window.__CRS_BASE__ = basePath.replace(/\/+$/, '');
+        })();
+    </script>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园报修系统 · 登录</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-body">
+<div class="auth-wrap">
+    <div class="auth-hero">
+        <h1>校园报修系统</h1>
+        <p class="subtitle">Campus Repair Service System</p>
+        <ul class="hero-list">
+            <li>在线提交报修，随时查看处理进度</li>
+            <li>维修管理员审核派单，支持智能派单匹配</li>
+            <li>维修人员移动处理，进度与耗材全程留痕</li>
+            <li>维修结果确认、评价与统计分析闭环</li>
+        </ul>
+        <div class="hero-footer">
+            <span>依据《校园报修系统需求分析和系统详细设计书》实现</span>
+        </div>
+    </div>
+    <div class="auth-card">
+        <h2>用户登录</h2>
+        <div id="alert" class="alert hidden"></div>
+        <form id="loginForm" autocomplete="off">
+            <label>用户名
+                <input type="text" name="username" placeholder="请输入用户名" required>
+            </label>
+            <label>密码
+                <input type="password" name="password" placeholder="请输入密码" required>
+            </label>
+            <label>当前位置（维修人员填写，用于派单参考）
+                <input type="text" name="location" placeholder="如：1号教学楼值班室">
+            </label>
+            <button type="submit" class="btn btn-primary btn-block">登录</button>
+        </form>
+        <div class="auth-links">
+            <a href="/register.html">还没有账户？立即注册</a>
+        </div>
+        <div class="demo-accounts">
+            <div class="demo-title">演示账号（内存库模式预置，MySQL 模式见 db/seed.sql）</div>
+            <table class="table table-compact">
+                <thead><tr><th>角色</th><th>用户名</th><th>密码</th></tr></thead>
+                <tbody>
+                <tr><td>报修人（学生）</td><td>student</td><td>123456</td></tr>
+                <tr><td>报修人（教职工）</td><td>teacher</td><td>123456</td></tr>
+                <tr><td>维修人员</td><td>worker01</td><td>worker123</td></tr>
+                <tr><td>维修管理员</td><td>manager</td><td>manager123</td></tr>
+                <tr><td>系统管理员</td><td>admin</td><td>admin123</td></tr>
+                </tbody>
+            </table>
+            <div class="demo-tip" id="systemInfo">运行模式加载中…</div>
+        </div>
+    </div>
+</div>
+<script src="js/common.js"></script>
+<script src="js/login.js"></script>
+</body>
+</html>

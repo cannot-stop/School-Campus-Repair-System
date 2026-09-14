@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+        /* 上下文路径引导：兼容 Tomcat 部署在 /app 等非根上下文的情况。
+           在解析本页相对资源之前执行，把应用根路径写入 <base> 与 window.__CRS_BASE__。 */
+        (function () {
+            var p = location.pathname || '/';
+            var i = p.lastIndexOf('/');
+            var basePath = (i > 0 && p.substring(i + 1).indexOf('.') >= 0) ? p.substring(0, i + 1) : p;
+            if (basePath.charAt(basePath.length - 1) !== '/') { basePath += '/'; }
+            var base = document.createElement('base');
+            base.href = location.origin + basePath;
+            document.head.insertBefore(base, document.head.firstChild);
+            window.__CRS_BASE__ = basePath.replace(/\/+$/, '');
+        })();
+    </script>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园报修系统 · 我的报修</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside id="sidebar"></aside>
+    <div class="main">
+        <div class="topbar" id="topbar"></div>
+        <div class="content">
+            <div class="card">
+                <div class="card-head">
+                    <h3>报修查询</h3>
+                    <span class="muted">按状态、类别、楼栋、时间等条件查询本人报修单，列表分页展示</span>
+                </div>
+                <div class="card-body">
+                    <div class="filters">
+                        <label>状态<select id="fStatus"><option value="">全部</option></select></label>
+                        <label>类别<select id="fCategory"><option value="">全部</option></select></label>
+                        <label>楼栋<select id="fBuilding"><option value="">全部</option></select></label>
+                        <label>关键字<input type="text" id="fKeyword" placeholder="描述 / 房间号"></label>
+                        <label>开始日期<input type="date" id="fBegin"></label>
+                        <label>结束日期<input type="date" id="fEnd"></label>
+                        <button class="btn btn-primary" id="btnSearch">查询</button>
+                        <button class="btn btn-ghost" id="btnReset">重置</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head">
+                    <h3>报修单列表</h3>
+                    <span class="muted" id="pageTip"></span>
+                </div>
+                <div class="card-body">
+                    <div style="overflow-x:auto">
+                        <table class="table">
+                            <thead>
+                            <tr>
+                                <th>报修单号</th><th>报修地点</th><th>类别</th><th>故障描述</th>
+                                <th>紧急</th><th>状态</th><th>维修人员</th><th>提交时间</th><th>操作</th>
+                            </tr>
+                            </thead>
+                            <tbody id="listBody"></tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:8px;align-items:center">
+                        <button class="btn btn-sm btn-ghost" id="btnPrev">上一页</button>
+                        <span class="muted" id="pageInfo">-</span>
+                        <button class="btn btn-sm btn-ghost" id="btnNext">下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="js/common.js"></script>
+<script src="js/report.js"></script>
+</body>
+</html>

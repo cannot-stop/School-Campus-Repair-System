@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+        /* 上下文路径引导：兼容 Tomcat 部署在 /app 等非根上下文的情况。
+           在解析本页相对资源之前执行，把应用根路径写入 <base> 与 window.__CRS_BASE__。 */
+        (function () {
+            var p = location.pathname || '/';
+            var i = p.lastIndexOf('/');
+            var basePath = (i > 0 && p.substring(i + 1).indexOf('.') >= 0) ? p.substring(0, i + 1) : p;
+            if (basePath.charAt(basePath.length - 1) !== '/') { basePath += '/'; }
+            var base = document.createElement('base');
+            base.href = location.origin + basePath;
+            document.head.insertBefore(base, document.head.firstChild);
+            window.__CRS_BASE__ = basePath.replace(/\/+$/, '');
+        })();
+    </script>    <meta charset="UTF-8">
+    <title>校园报修系统 · 页面不存在</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-body">
+<div class="auth-card" style="max-width:520px;margin:auto">
+    <h2>404 · 页面不存在</h2>
+    <div class="alert alert-error">你访问的页面不存在或已被移动。</div>
+    <div class="row-actions">
+        <a class="btn btn-primary" href="/index.html">返回登录页</a>
+        <a class="btn btn-ghost" href="/home.html">返回工作台</a>
+    </div>
+</div>
+</body>
+</html>

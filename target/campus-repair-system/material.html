@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+        /* 上下文路径引导：兼容 Tomcat 部署在 /app 等非根上下文的情况。
+           在解析本页相对资源之前执行，把应用根路径写入 <base> 与 window.__CRS_BASE__。 */
+        (function () {
+            var p = location.pathname || '/';
+            var i = p.lastIndexOf('/');
+            var basePath = (i > 0 && p.substring(i + 1).indexOf('.') >= 0) ? p.substring(0, i + 1) : p;
+            if (basePath.charAt(basePath.length - 1) !== '/') { basePath += '/'; }
+            var base = document.createElement('base');
+            base.href = location.origin + basePath;
+            document.head.insertBefore(base, document.head.firstChild);
+            window.__CRS_BASE__ = basePath.replace(/\/+$/, '');
+        })();
+    </script>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园报修系统 · 耗材管理</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside id="sidebar"></aside>
+    <div class="main">
+        <div class="topbar" id="topbar"></div>
+        <div class="content">
+            <div class="card" id="lowStockCard">
+                <div class="card-head"><h3>库存预警（低于 10）</h3></div>
+                <div class="card-body" id="lowStockBody"></div>
+            </div>
+            <div class="card">
+                <div class="card-head">
+                    <h3>耗材清单</h3>
+                    <button class="btn btn-primary btn-sm" id="btnAdd">新增耗材</button>
+                </div>
+                <div class="card-body">
+                    <div style="overflow-x:auto">
+                        <table class="table">
+                            <thead><tr><th>ID</th><th>耗材名称</th><th>规格型号</th><th>库存</th><th>单价(元)</th><th>操作</th></tr></thead>
+                            <tbody id="listBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="js/common.js"></script>
+<script src="js/material.js"></script>
+</body>
+</html>

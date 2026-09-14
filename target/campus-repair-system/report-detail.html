@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+        /* 上下文路径引导：兼容 Tomcat 部署在 /app 等非根上下文的情况。
+           在解析本页相对资源之前执行，把应用根路径写入 <base> 与 window.__CRS_BASE__。 */
+        (function () {
+            var p = location.pathname || '/';
+            var i = p.lastIndexOf('/');
+            var basePath = (i > 0 && p.substring(i + 1).indexOf('.') >= 0) ? p.substring(0, i + 1) : p;
+            if (basePath.charAt(basePath.length - 1) !== '/') { basePath += '/'; }
+            var base = document.createElement('base');
+            base.href = location.origin + basePath;
+            document.head.insertBefore(base, document.head.firstChild);
+            window.__CRS_BASE__ = basePath.replace(/\/+$/, '');
+        })();
+    </script>    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园报修系统 · 报修详情</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside id="sidebar"></aside>
+    <div class="main">
+        <div class="topbar" id="topbar"></div>
+        <div class="content">
+            <div class="detail-grid">
+                <div class="card">
+                    <div class="card-head"><h3>报修单信息</h3><span id="statusTag"></span></div>
+                    <div class="card-body" id="orderInfo">加载中…</div>
+                </div>
+                <div>
+                    <div class="card">
+                        <div class="card-head"><h3>维修任务与进度</h3></div>
+                        <div class="card-body" id="taskInfo">加载中…</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-head"><h3>耗材使用</h3></div>
+                        <div class="card-body" id="usageInfo">加载中…</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-head"><h3>处理时间线</h3></div>
+                <div class="card-body" id="timeline">加载中…</div>
+            </div>
+            <div id="actionBar" style="display:flex;gap:10px"></div>
+        </div>
+    </div>
+</div>
+<script src="js/common.js"></script>
+<script>
+    (function () {
+        var me = App.shell({ key: 'report', title: '报修详情' });
+        if (!me) { return; }
+        var orderId = new URLSearchParams(location.search).get('orderId');
+        if (!orderId) {
+            document.getElementById('orderInfo').innerHTML = '<div class="alert alert-error">缺少报修单号参数</div>';
+            return;
+        }
+
+        App.api('/api/report/detail', { orderId: orderId }, 'GET').done(function (data) {
+            var order = data.order;
+            document.getElementById('statusTag').innerHTML = App.orderStatusTag(order.status);
+            document.getElementById('orderInfo').innerHTML =
+                '<div class="kv">' +
+                row('报修单号', '#' + order.orderId) +
+                row('报修人', (order.reporterName || '') + '（' + (order.reporterPhone || '') + '）') +
+                row('报修地点', order.location) +
+                row('报修类别', order.category) +
+                row('紧急程度', order.priority === 1 ? '紧急' : '普通') +
+                row('故障描述', order.description) +
+                row('现场照片', (order.imageList && order.imageList.length) ? order.imageList.length + ' 张' : '无') +
+                row('提交时间', App.formatDate(order.createTime)) +
+                row('更新时间', App.formatDate(order.updateTime)) +
+                row('催办次数', order.urgeCount) +
+                (order.rejectReason ? row('驳回原因', order.rejectReason) : '') +
+                row('评价', order.evalScore ? App.stars(order.evalScore) + ' ' + App.escapeHtml(order.evalComment || '') : '未评价') +
+                (order.evalReply ? row('管理员回复', order.evalReply) : '') +
+                '</div>';
+
+            var taskHtml = '';
+            if (order.workerName) {
+                taskHtml += '<div class="kv">' +
+                    row('维修任务号', '#' + order.taskId) +
+                    row('维修人员', order.workerName + '（' + (order.workerPhone || '') + '）') +
+                    row('任务状态', App.TASK_STATUS[order.taskStatus] ? App.TASK_STATUS[order.taskStatus].text : '—') +
+                    row('派单时间', App.formatDate(order.dispatchTime)) +
+                    row('接单时间', App.formatDate(order.acceptTime)) +
+                    row('完成登记', App.formatDate(order.finishTime)) +
+                    row('维修结果', order.result || '—') +
+                    row('备注 / 延期原因', order.remark || '—') +
+                    '</div>';
+            } else {
+                taskHtml = '<div class="empty">尚未派单</div>';
+            }
+            document.getElementById('taskInfo').innerHTML = taskHtml;
+
+            var usageRows = (data.usages || []).map(function (item) {
+                return '<tr><td>' + App.escapeHtml(item.matName || '') + '</td><td>' + App.escapeHtml(item.spec || '') +
+                    '</td><td>' + item.useCount + '</td><td>' + (item.unitPrice || 0) + '</td><td>' + (item.amount || 0) + '</td></tr>';
+            }).join('');
+            document.getElementById('usageInfo').innerHTML = usageRows
+                ? '<table class="table table-compact"><thead><tr><th>耗材</th><th>规格</th><th>数量</th><th>单价</th><th>小计</th></tr></thead><tbody>' + usageRows + '</tbody></table>'
+                : '<div class="empty">暂无耗材使用记录</div>';
+
+            var timeline = '<ul class="timeline">';
+            timeline += '<li><div>提交报修申请</div><div class="time">' + App.formatDate(order.createTime) + '</div></li>';
+            (order.progressList || []).forEach(function (item) {
+                timeline += '<li><div>' + App.escapeHtml(item.content) + '</div><div class="time">' + App.formatDate(item.createTime) + '</div></li>';
+            });
+            if (order.acceptTime) {
+                timeline += '<li><div>维修人员接单</div><div class="time">' + App.formatDate(order.acceptTime) + '</div></li>';
+            }
+            if (order.finishTime) {
+                timeline += '<li><div>完成维修登记，等待确认</div><div class="time">' + App.formatDate(order.finishTime) + '</div></li>';
+            }
+            if (order.status === 5) {
+                timeline += '<li><div>维修结果已确认，报修单归档</div></li>';
+            }
+            timeline += '</ul>';
+            document.getElementById('timeline').innerHTML = timeline;
+
+            var actions = '';
+            if (me.role === 'reporter' && order.userId === me.userId) {
+                if (order.cancelable) {
+                    actions += '<button class="btn btn-ghost" id="btnCancel">撤销报修</button>';
+                }
+                if (order.urgable) {
+                    actions += '<button class="btn btn-warn" id="btnUrge">催办</button>';
+                }
+                if (order.status === 4) {
+                    actions += '<button class="btn btn-success" id="btnConfirmPass">确认维修结果</button>';
+                    actions += '<button class="btn btn-danger" id="btnConfirmReject">退回重新处理</button>';
+                }
+                if (order.evaluable) {
+                    actions += '<button class="btn btn-primary" id="btnEval">评价服务</button>';
+                }
+            }
+            document.getElementById('actionBar').innerHTML = actions;
+            bind(order, me);
+        });
+
+        function row(k, v) {
+            return '<div class="k">' + App.escapeHtml(k) + '</div><div class="v">' + (v === null || v === undefined ? '—' : v) + '</div>';
+        }
+
+        function bind(order, me) {
+            var el = document.getElementById('btnCancel');
+            if (el) {
+                el.onclick = function () {
+                    App.confirmDialog('撤销报修', '确定撤销报修单 #' + order.orderId + ' 吗？', function (reason) {
+                        App.api('/api/report/cancel', { orderId: order.orderId, reason: reason }).done(function () {
+                            App.toast('已撤销', 'success');
+                            location.reload();
+                        });
+                    }, '撤销原因');
+                };
+            }
+            el = document.getElementById('btnUrge');
+            if (el) {
+                el.onclick = function () {
+                    App.confirmDialog('报修催办', '将通知维修管理员与维修人员尽快处理。', function (reason) {
+                        App.api('/api/report/urge', { orderId: order.orderId, reason: reason }).done(function () {
+                            App.toast('已催办', 'success');
+                            location.reload();
+                        });
+                    }, '催办说明');
+                };
+            }
+            el = document.getElementById('btnConfirmPass');
+            if (el) {
+                el.onclick = function () {
+                    App.api('/api/repair/confirm', { orderId: order.orderId, pass: true }).done(function () {
+                        App.toast('已确认，报修单归档', 'success');
+                        location.reload();
+                    });
+                };
+            }
+            el = document.getElementById('btnConfirmReject');
+            if (el) {
+                el.onclick = function () {
+                    App.confirmDialog('退回重新处理', '确认不通过将退回维修人员重新处理，并回滚已登记的耗材。', function (reason) {
+                        if (!reason) { App.toast('请填写不通过原因', 'error'); return; }
+                        App.api('/api/repair/confirm', { orderId: order.orderId, pass: false, reason: reason }).done(function () {
+                            App.toast('已退回', 'success');
+                            location.reload();
+                        });
+                    }, '不通过原因');
+                };
+            }
+            el = document.getElementById('btnEval');
+            if (el) {
+                el.onclick = function () {
+                    var stars = '';
+                    for (var i = 1; i <= 5; i++) {
+                        stars += '<label style="display:inline-block;margin-right:12px"><input type="radio" name="score" value="' + i + '"' +
+                            (i === 5 ? ' checked' : '') + '> ' + i + ' 分</label>';
+                    }
+                    var mask = App.openModal('维修服务评价',
+                        '<label>评分<div style="margin-top:6px">' + stars + '</div></label>' +
+                        '<label>评价内容<textarea id="c"></textarea></label>',
+                        '<button class="btn btn-ghost" id="c0">取消</button><button class="btn btn-primary" id="c1">提交</button>');
+                    mask.querySelector('#c0').onclick = App.closeModal;
+                    mask.querySelector('#c1').onclick = function () {
+                        App.api('/api/eval/submit', {
+                            orderId: order.orderId,
+                            score: mask.querySelector('input[name=score]:checked').value,
+                            comment: mask.querySelector('#c').value.trim()
+                        }).done(function () {
+                            App.closeModal();
+                            App.toast('评价提交成功', 'success');
+                            location.reload();
+                        });
+                    };
+                };
+            }
+        }
+    })();
+</script>
+</body>
+</html>
