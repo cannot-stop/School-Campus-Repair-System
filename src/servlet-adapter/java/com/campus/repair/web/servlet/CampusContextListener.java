@@ -2,7 +2,6 @@ package com.campus.repair.web.servlet;
 
 import com.campus.repair.config.AppConfig;
 import com.campus.repair.dao.DaoFactory;
-import com.campus.repair.dao.jdbc.Database;
 import com.campus.repair.dao.mybatis.MyBatisSessionFactory;
 
 import jakarta.servlet.ServletContextEvent;
@@ -52,16 +51,15 @@ public class CampusContextListener implements ServletContextListener {
         String dbStatus;
         if (DaoFactory.isMemoryMode()) {
             dbStatus = "（内存库模式，未连接数据库）";
-        } else if (DaoFactory.isMyBatisMode()) {
-            dbStatus = MyBatisSessionFactory.testConnection();
         } else {
-            dbStatus = Database.testConnection();
+            // 数据库持久化只有 MyBatis 一种实现
+            dbStatus = MyBatisSessionFactory.testConnection();
         }
         log(event, "校园报修系统启动完成：存储模式=" + DaoFactory.mode()
                 + "，数据访问=" + describeDao() + "，数据库=" + dbStatus + "，可用账户数=" + accountCount);
 
         if (DaoFactory.isDatabaseMode() && dbStatus.startsWith("FAILED")) {
-            if (DaoFactory.isMyBatisMode() && !MyBatisSessionFactory.configAvailable()) {
+            if (!MyBatisSessionFactory.configAvailable()) {
                 // 这种失败与数据库账号密码无关：MyBatis 的 XML 配置没被打进 WEB-INF/classes
                 log(event, "[错误] 数据库连接失败：MyBatis 配置未进入类路径（WEB-INF/classes 下缺少 mybatis-config.xml"
                         + " 或 mapper/*.xml），与 db.url/db.username/db.password 无关。"
@@ -85,10 +83,7 @@ public class CampusContextListener implements ServletContextListener {
         if (DaoFactory.isMemoryMode()) {
             return "内存库 Dao（MemoryXxxDaoImpl）";
         }
-        if (DaoFactory.isMyBatisMode()) {
-            return "MyBatis Mapper（resources/mapper/*.xml）";
-        }
-        return "手写 SQL 的 JDBC Dao（JdbcXxxDaoImpl）";
+        return "MyBatis Mapper（resources/mapper/*.xml）";
     }
 
     /** 统计当前可用账户数（用于启动自检） */

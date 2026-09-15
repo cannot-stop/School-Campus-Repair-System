@@ -8,7 +8,7 @@
 | 项目 | 说明 |
 | --- | --- |
 | 技术栈 | Java 17+（已在 JDK 25 上验证）、Jakarta Servlet（Tomcat 10/11）、**MyBatis 3.5 Mapper**、MySQL 8.0 |
-| 架构 | MVC 分层：8 个功能 Controller + 1 个前端控制器、8 个 Service、10 个 DAO 接口（**MyBatis** / 手写 SQL / 内存库 三套可切换实现） |
+| 架构 | MVC 分层：8 个功能 Controller + 1 个前端控制器、8 个 Service、10 个 DAO 接口（**MyBatis** / 内存库 两套可切换实现） |
 | 持久化 | **MyBatis 3.5.16**：10 个 Mapper 接口 + 10 个 Mapper XML、99 条映射语句，SQL 全部在 `src/main/resources/mapper/*.xml` |
 | 数据库 | MySQL 8.0，`campus_repair` 库，10 张表（设计书 8 张业务表 + 2 张支撑表） |
 | 接口 | 65 个 REST 接口，统一 `Result{code,message,data}` 返回结构 |
@@ -126,8 +126,7 @@ campus-repair-system/
     │   ├─ dao/
     │   │   ├─ mapper/  MyBatis Mapper 接口（10 个）+ RepairOrderQuery（分页查询入参）
     │   │   ├─ mybatis/ MyBatis Dao 实现 + MyBatisSessionFactory（会话与事务）
-    │   │   ├─ jdbc/    手写 SQL 的对照实现（JdbcTemplate、Database 连接池）
-    │   │   └─ memory/  内存库实现（无数据库演示）
+    │   │   └─ memory/  内存库实现（无数据库演示与业务自测）
     │   ├─ dal/         MyBatisCapabilityProbe（数据访问层自检：报告实际使用的 DAO 实现）
     │   ├─ service/     8 个业务服务 + 事务模板
     │   ├─ util/        PasswordUtil / DateUtil / JsonUtil
@@ -282,7 +281,7 @@ campus-repair-system/
 | 5 | 表 2.15 耗材使用表仅 5 个字段 | 表结构保持一致，通过 `t_material.unit_price` 关联计算金额（`MaterialUsage.getAmount()`）用于成本统计 | 不改变设计书物理结构，同时在统计模块满足成本核算需求 |
 | 6 | 维修进度反馈无对应表 | 新增 `t_progress` 表记录进度与延期原因 | 表 1.10 要求"进度反馈""延期原因必填"，需持久化留痕 |
 | 7 | 基础数据（楼栋/设备类型/工种）维护无对应表 | 新增 `t_base_data` 表 | 1.1.1 明确系统管理员需维护这些基础数据 |
-| 8 | 数据访问层提到 MyBatis/Hibernate | 采用 **MyBatis 3.5.16 正式实现**：10 个 Mapper 接口 + 10 个 Mapper XML（99 条语句），SQL 位于 `src/main/resources/mapper/*.xml`；另保留手写 SQL 的 `dao/jdbc/` 与 `dao/memory/` 作为对照实现，通过 `storage.mode` 一步切换 | 完全对齐设计书"数据访问层由 MyBatis 实现"的描述；保留等价实现便于对照教学与无数据库环境演示 |
+| 8 | 数据访问层提到 MyBatis/Hibernate | 采用 **MyBatis 3.5.16 正式实现**：10 个 Mapper 接口 + 10 个 Mapper XML（99 条语句），SQL 位于 `src/main/resources/mapper/*.xml`；另保留 `dao/memory/` 内存库实现，通过 `storage.mode` 一步切换 | 完全对齐设计书"数据访问层由 MyBatis 实现"的描述；内存库实现用于无数据库环境演示与业务自测（99 项断言即运行在内存库上） |
 | 9 | 表 2.15 无唯一约束 | 增加 `uk_usage_task_mat` 唯一键，登记同一耗材时累加数量 | 防止同一任务同一耗材出现重复记录 |
 | 10 | 界面形态为 JSP 页面 | 前端为静态页面 + JSON 接口（同一套接口契约），视图层由 `webapp/*.html` + `js/` 承担；工程内未放置 `.jsp` 文件 | 静态页面便于自动化验证与团队分工；`web.xml` 已保留 `jsp-config` 与 `/WEB-INF/jsp/*` 访问保护，如需 JSP 形态可直接在 `webapp/WEB-INF/jsp/` 下补充视图，后端接口无需改动 |
 
@@ -336,7 +335,6 @@ campus-repair-system/
 | `test/.../ParamMapTest.java` | 请求参数解析（JSON/表单/中文/数组） |
 | `test/.../DispatchCheck.java` | 智能派单得分与演示数据技能匹配核对 |
 | `test/.../CategoryTrace.java` | 报修单类别在「提交→审核→派单」链路上不被清空的回归验证 |
-| `test/.../JdbcFlowCheck.java` | JDBC 模式下派单→接单→开始维修的时间字段持久化核对 |
 | `test/.../ConfigProbe.java` | 配置优先级（`-D` 参数覆盖 `config.properties`）核对 |
 
 ### 7.4 实施过程中发现并修复的真实缺陷
@@ -361,7 +359,7 @@ campus-repair-system/
 8. **Servlet 参数读取冲突**：`ApiServlet` 先 `getParameter()` 再读 `getInputStream()`，
    在 Tomcat 下会拿不到 JSON 请求体。已拆分为「JSON 体自行解析 / 表单参数交由容器解析」两条互斥路径，
    并新增 `Dispatcher.dispatchWithParams()` 供容器适配层复用（避免重复读体）。
-9. **配置口令为空的静默失败**：`web.xml` 的 `db.password` 为空时，jdbc 模式连接失败却只表现为"用户名或密码错误"；
+9. **配置口令为空的静默失败**：`web.xml` 的 `db.password` 为空时，数据库连接失败却只表现为"用户名或密码错误"；
    已支持环境变量覆盖（`CAMPUS_DB_PASSWORD`），并在 `CampusContextListener` 增加启动自检，
    日志明确打印存储模式、数据库连通性与**可用账户数**，账号为 0 时给出明确处置提示。
 10. **IDEA 模块残留错误 Web Facet**：`campus-repair-system.iml` 中曾同时配置 `webapp` 与已删除的
@@ -423,7 +421,7 @@ campus-repair-system/
    `http://localhost:8080/<你的上下文>/`，用 `student / 123456` 登录。
 4. 启动日志（IDEA 控制台与 `logs/localhost.*.log`）会出现自检信息，务必确认这一行的形态：
    ```
-   :: mybatis / jdbc 模式（已连上数据库）
+   :: mybatis 模式（已连上数据库）
    [CampusRepair] 校园报修系统启动完成：存储模式=mybatis，数据访问=MyBatis Mapper（resources/mapper/*.xml），
    数据库=OK: MySQL 8.0.25（MyBatis MySQL Connector/J 连接池），可用账户数=8
 
@@ -459,8 +457,7 @@ set JAVA_HOME=D:\Java
 | 取值 | 数据访问实现 | 用途 |
 | --- | --- | --- |
 | `mybatis`（**默认/正式部署**） | `dao/mybatis/MyBatisXxxDaoImpl` + `resources/mapper/*.xml` | MyBatis Mapper + MySQL，SQL 集中管理 |
-| `jdbc` | `dao/jdbc/JdbcXxxDaoImpl`（手写 SQL） | 对照实现，便于比较两种写法 |
-| `memory` | `dao/memory/MemoryXxxDaoImpl` | 无数据库演示（内置演示数据） |
+| `memory` | `dao/memory/MemoryXxxDaoImpl` | 无数据库演示与业务自测（内置演示数据） |
 
 **文件构成**
 
@@ -511,7 +508,7 @@ slf4j-simple-1.7.36.jar   简易日志实现（可选，便于在控制台看到
 
 | 配置项 | 取值位置（Tomcat 部署） | 说明 |
 | --- | --- | --- |
-| `storage.mode` | `WEB-INF/web.xml` 的 `context-param`（当前为 `mybatis`） | `mybatis` / `jdbc` / `memory` |
+| `storage.mode` | `WEB-INF/web.xml` 的 `context-param`（当前为 `mybatis`） | `mybatis` / `memory` |
 | `db.url` / `db.username` / `db.password` | `WEB-INF/web.xml` 的 `context-param` | MyBatis 数据源连接参数 |
 | `dispatch.acceptDeadlineMinutes` | `WEB-INF/web.xml` 的 `context-param` | 接单时限（表 1.8：2 小时） |
 | `order.confirmDeadlineHours` | `WEB-INF/web.xml` 的 `context-param` | 结果确认时限（表 1.9：24 小时） |
@@ -530,7 +527,7 @@ set CAMPUS_DB_PASSWORD=你的密码
 
 ### 8.5 扩展点
 
-- **替换数据访问框架**：`dao/` 下 10 个 DAO 接口已有 MyBatis、手写 SQL、内存三套实现，
+- **替换数据访问框架**：`dao/` 下 10 个 DAO 接口已有 MyBatis、内存库两套实现，
   只需改 `storage.mode` 或在 `DaoFactory` 中切换实现类，Service 层无需改动
   （设计书 1.2 可维护性要求）。新增实体只需补 Mapper 接口 + Mapper XML，并在
   `mybatis-config.xml` 的 `<mappers>` 中注册。
@@ -544,7 +541,7 @@ set CAMPUS_DB_PASSWORD=你的密码
 | --- | --- | --- |
 | 登录页能打开，点「登录」无任何反应（右上角仅有短暂红色提示） | 接口请求 404，`/api/*` 未部署或路径不对 | 确认 `WEB-INF/classes` 下有 `com/campus/repair/web/servlet/ApiServlet.class`；打开浏览器 F12 → Network，看 `/api/account/login` 的状态码与响应体 |
 | 接口返回 `{"code":1005,"message":"接口不存在：/应用上下文/api/..."}` | 上下文路径未被剥离（旧版本缺陷，已修复） | 使用当前版本代码；`ApiServlet` 已按 `request.getContextPath()` 剥离前缀 |
-| 接口返回 `{"code":1002,"message":"用户名或密码错误"}` | 账号数据源为空：内存库演示数据未装载，或 jdbc 模式未执行建库脚本 / 库密码不对 | 看启动自检日志的 `可用账户数`；为 0 时：改用 `storage.mode=memory` 快速验证，或执行 `db/schema.sql` + `db/seed.sql` 并核对 `db.password` |
+| 接口返回 `{"code":1002,"message":"用户名或密码错误"}` | 账号数据源为空：内存库演示数据未装载，或未执行建库脚本 / 库密码不对 | 看启动自检日志的 `可用账户数`；为 0 时：改用 `storage.mode=memory` 快速验证，或执行 `db/schema.sql` + `db/seed.sql` 并核对 `db.password` |
 | 启动日志出现 `数据库=FAILED: MyBatis 配置未进入类路径…`，后跟一条 `[错误] 数据库连接失败…` | MyBatis 的 XML 配置没被打进 WAR：`WEB-INF/classes` 下缺 `mybatis-config.xml` 或 `mapper/*.xml`（IDEA 增量构建没拷贝 `src/main/resources` 时会出现） | 与数据库账号密码无关。执行一次 `build.cmd`（会把 `src/main/resources` 同步到 `webapp/WEB-INF/classes`），确认该目录下有 `mybatis-config.xml` 与 `mapper/` 后再重新构建 artifact 并重启 |
 | 启动日志出现 `数据库=FAILED: …` 且提示的是连接或认证失败 | `db.url/db.username/db.password` 与本机 MySQL 不一致 | 修正 `web.xml` 的 context-param，或设置环境变量 `CAMPUS_DB_PASSWORD` |
 | `数据库=OK` 但 `可用账户数=0`（或为负数） | 建库脚本没执行，或连到了另一个空库 | 执行 `db/schema.sql` + `db/seed.sql`，并核对 `db.url` 中的库名 |

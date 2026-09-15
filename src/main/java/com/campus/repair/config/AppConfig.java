@@ -134,11 +134,6 @@ public final class AppConfig {
         return props;
     }
 
-    /** 是否使用 JDBC（MySQL）持久化 */
-    public static boolean isJdbcMode() {
-        return "jdbc".equalsIgnoreCase(get("storage.mode", "memory"));
-    }
-
     /** 接单时限（分钟） */
     public static int acceptDeadlineMinutes() {
         return getInt("dispatch.acceptDeadlineMinutes", 120);

@@ -3,10 +3,10 @@ package com.campus.repair.dao;
 import com.campus.repair.config.AppConfig;
 
 /**
- * 数据访问工厂：根据 storage.mode 配置返回 JDBC（MySQL）或内存实现。
+ * 数据访问工厂：根据 storage.mode 配置返回 MyBatis（MySQL）或内存实现。
  *
- * <p>storage.mode=jdbc   → com.campus.repair.dao.jdbc.JdbcXxxDaoImpl（MySQL 持久化，正式部署）<br>
- * storage.mode=memory → com.campus.repair.dao.memory.MemoryXxxDaoImpl（内存库，用于无数据库环境的演示、自测与教学）</p>
+ * <p>storage.mode=mybatis → com.campus.repair.dao.mybatis.MyBatisXxxDaoImpl（MyBatis Mapper + MySQL，正式部署）<br>
+ * storage.mode=memory  → com.campus.repair.dao.memory.MemoryXxxDaoImpl（内存库，用于无数据库环境的演示、自测与教学）</p>
  *
  * <p>两种实现遵循同一组 Dao 接口，Service 层无需感知差异，体现设计书"数据访问层屏蔽数据库访问细节"的设计目标。</p>
  */
@@ -34,15 +34,15 @@ public final class DaoFactory {
             return;
         }
         String configured = AppConfig.get("storage.mode", "mybatis").toLowerCase();
-        if ("memory".equals(configured) || "jdbc".equals(configured) || "mybatis".equals(configured)) {
+        if ("memory".equals(configured) || "mybatis".equals(configured)) {
             mode = configured;
         } else {
-            // 兼容旧配置值（hibernate / spring-jdbc 等）统一按 MyBatis 处理
+            // 其他取值（含已移除的 jdbc，以及 hibernate / spring-jdbc 等旧写法）统一按 MyBatis 处理
             mode = "mybatis";
         }
     }
 
-    /** 当前存储模式：memory（内存库演示）/ mybatis（MyBatis + MySQL）/ jdbc（手写 SQL + MySQL） */
+    /** 当前存储模式：memory（内存库演示）/ mybatis（MyBatis Mapper + MySQL） */
     public static String mode() {
         init();
         return mode;
@@ -58,33 +58,22 @@ public final class DaoFactory {
         return "mybatis".equals(mode());
     }
 
-    /** 是否使用手写 SQL 的 JDBC 实现（保留作为等价实现） */
-    public static boolean isJdbcMode() {
-        return "jdbc".equals(mode());
-    }
-
-    /** 是否使用数据库持久化（MyBatis 或 JDBC），事务需要真实数据库连接 */
+    /** 是否使用数据库持久化（MyBatis），事务需要真实数据库连接 */
     public static boolean isDatabaseMode() {
         return !isMemoryMode();
     }
 
     /**
      * 按接口名反射创建实现类。
-     * 接口 UserDao → memory 模式 {@code MemoryUserDaoImpl}；
-     * mybatis 模式 {@code MyBatisUserDaoImpl}；jdbc 模式 {@code JdbcUserDaoImpl}。
+     * 接口 UserDao → memory 模式 {@code MemoryUserDaoImpl}；mybatis 模式 {@code MyBatisUserDaoImpl}。
      */
     private static Object create(Class<?> type) {
         init();
         String simple = type.getSimpleName();
         String base = simple.endsWith("Dao") ? simple.substring(0, simple.length() - 3) : simple;
-        String prefix;
-        if (isMemoryMode()) {
-            prefix = "com.campus.repair.dao.memory.Memory";
-        } else if (isMyBatisMode()) {
-            prefix = "com.campus.repair.dao.mybatis.MyBatis";
-        } else {
-            prefix = "com.campus.repair.dao.jdbc.Jdbc";
-        }
+        String prefix = isMemoryMode()
+                ? "com.campus.repair.dao.memory.Memory"
+                : "com.campus.repair.dao.mybatis.MyBatis";
         String className = prefix + base + "DaoImpl";
         try {
             Class<?> clazz = Class.forName(className);

@@ -5,7 +5,7 @@
   部署方式：IDEA + Tomcat（Web 根 = 项目内 webapp 目录）
 
   运行入口：ApiServlet（映射 /api/*，参数适配与调度）+ CampusContextListener（启动初始化与自检）
-  前端静态页面位于 webapp/ 目录，JSP 视图位于 webapp/WEB-INF/jsp/。
+  前端静态页面位于 webapp/ 目录。
 -->
 <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -21,11 +21,10 @@
                环境变量优先级最高（如 CAMPUS_DB_PASSWORD 可覆盖下面的 db.password）。
 
          storage.mode：
-           mybatis —— MyBatis Mapper + MySQL（正式部署，SQL 见 src/main/resources/mapper/*.xml）
-           jdbc    —— 手写 SQL + MySQL（与 MyBatis 版本等价，保留作为对照实现）
+           mybatis —— MyBatis Mapper + MySQL（正式部署，SQL 见 resources/mapper/*.xml）
            memory  —— 内存库演示模式，无需数据库即可登录（内置演示账号）
 
-         切到 mybatis / jdbc 前，请先执行 db/schema.sql 与 db/seed.sql。
+         切到 mybatis 前，请先执行 db/schema.sql 与 db/seed.sql。
          并确认 WEB-INF/lib 下有：mybatis-3.5.16.jar、mysql-connector-j-8.3.0.jar、
          slf4j-api-1.7.36.jar（另建议放 slf4j-simple-1.7.36.jar 以打印 MyBatis 日志）。
     -->

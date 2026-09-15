@@ -11,7 +11,7 @@
 
 | 验证项 | 方式 | 结果 |
 | --- | --- | --- |
-| 源码编译 | `build.cmd -Clean -WithSelfTest`（javac，115 个源文件，含 Servlet 适配层与 MyBatis Dao） | ✅ 编译通过（退出码 0） |
+| 源码编译 | `build.cmd -Clean -WithSelfTest`（javac，102 个源文件，含 Servlet 适配层与 MyBatis Dao） | ✅ 编译通过（退出码 0） |
 | 业务规则自测 | `build/selftest.log`（18 组用例，容器无关的 Service/DAO 层） | ✅ **99 项断言全部通过** |
 | **MyBatis Mapper 层定点验证** | `build/mybatis-check.log`（`test/.../MyBatisCheck.java`） | ✅ **39 项断言全部通过** |
 | **端到端接口验证（Tomcat 11 + MyBatis + MySQL，当前部署形态）** | `build/http-e2e.log`（16 组用例，`scripts/http-e2e.ps1`） | ✅ **97 项断言全部通过** |
@@ -71,15 +71,15 @@
 | # | 缺陷 | 影响 | 修复 |
 | --- | --- | --- | --- |
 | 1 | `RepairOrderDao.update()` 整行覆盖，审核时只设优先级导致类别/地点/描述被清空 | 智能派单技能匹配恒为 0，报修单信息丢失 | 改为仅更新非空字段；`SelfTestRunner` 增加 3 项回归断言，`CategoryTrace` 定点验证 |
-| 2 | MySQL Connector/J 8.x 将 DATETIME 映射为 `java.time.LocalDateTime`，原映射器只识别 `java.util.Date` | JDBC 模式下派单/开始/完成/注册时间为 null，超时监督、月度趋势统计无数据 | `RowMapper` 增加 `LocalDateTime/LocalDate/LocalTime` 转换；`JdbcFlowCheck` 定点验证 |
-| 3 | JDBC 耗材使用查询未关联耗材表 | 耗材成本统计恒为 0 | 补 `LEFT JOIN t_material`，带出名称、规格、单价 |
+| 2 | MySQL Connector/J 8.x 将 DATETIME 映射为 `java.time.LocalDateTime`，当时的映射器只识别 `java.util.Date` | 派单/开始/完成/注册时间读取为 null，超时监督、月度趋势统计无数据 | 当时的 `RowMapper` 增加 `LocalDateTime/LocalDate/LocalTime` 转换（该手写 SQL 层后续已按要求移除；MyBatis 模式下由 MyBatis 自身的类型处理器完成同样转换，39 项定点验证覆盖时间字段回读） |
+| 3 | 手写 SQL 的耗材使用查询未关联耗材表 | 耗材成本统计恒为 0 | 补 `LEFT JOIN t_material`，带出名称、规格、单价（MyBatis 版 `MaterialUsageMapper` 同样带出这三列） |
 | 4 | `schema.sql` 中 `t_repair_task` 外键指向尚未创建的 `t_worker` | 建表脚本执行失败 | 调整建表顺序（t_worker 先于 t_repair_task） |
 | 5 | 演示账号在 SQL 与内存数据中命名不一致 | 同一套演示脚本无法跨模式使用 | 统一为 `student`/`teacher`/`worker01-03`/`manager`/`admin` |
 | 6 | `ApiServlet` 把含上下文路径的 `requestURI` 当作路由路径（Tomcat 部署后所有接口 404/"接口不存在"） | 界面能打开但任何操作都无反应——**用户实际遇到的问题** | 按 `request.getContextPath()` 剥离前缀后交给路由；Tomcat 下 97 项端到端断言验证通过 |
 | 7 | 前端接口调用写死根路径 `fetch('/api/...')` | 部署到非根上下文（如 `/campus_repair_system_war`）时请求全部打空 | 接口调用统一经 `common.js` 的 `App.url()` 拼接上下文前缀；页面顶部注入 `<base>`，页面跳转与静态资源全部改为相对路径 |
 | 8 | 前端用 `document.cookie` 写 `CRS_TOKEN; path=/`，与容器下发的 `path=/上下文` 形成两个同名 Cookie | 登录成功但后续接口返回 1003「登录状态已失效」 | Cookie 按上下文路径写入并清理旧 Cookie；服务端从候选令牌中挑选能对应有效会话的那个（已用"双 Cookie"场景实测） |
 | 9 | `ApiServlet` 先 `getParameter()` 再读 `getInputStream()`（Servlet 规范下二选一） | Tomcat 下 JSON 请求体读取为参数失败 | 拆分为 JSON 体自行解析 / 表单参数交由容器解析两条互斥路径；新增 `Dispatcher.dispatchWithParams()` 供适配层复用 |
-| 10 | `web.xml` 中 `db.password` 为空导致 jdbc 模式连接失败，但对外只表现为"用户名或密码错误" | 部署后登录失败原因不可见 | 支持环境变量覆盖（`CAMPUS_DB_PASSWORD`）；`CampusContextListener` 增加启动自检，明确打印存储模式、数据库连通性与可用账户数 |
+| 10 | `web.xml` 中 `db.password` 为空导致数据库连接失败，但对外只表现为"用户名或密码错误" | 部署后登录失败原因不可见 | 支持环境变量覆盖（`CAMPUS_DB_PASSWORD`）；`CampusContextListener` 增加启动自检，明确打印存储模式、数据库连通性与可用账户数 |
 | 11 | 页面跳转链接写成根路径绝对地址（登录页 `/register.html` 等共 10 处） | 在非根上下文部署下点击「立即注册」跳到 404——**"可以登录但无法注册"的原因** | 全部改为相对路径（`register.html`、`task.html?taskId=…`）；`App.url()` 增加防重复拼接保护；已用「登录页→注册页→提交注册→管理员审核→登录→提交报修」整链路实测 |
 | 12 | IDEA 那次是**增量构建**（`No changes found since last build`），没把 `src/main/resources` 拷进模块输出目录，artifact 的 `WEB-INF/classes` 只有 `com/`，缺 `mybatis-config.xml` 与 `mapper/*.xml`；而启动自检把它笼统报成"数据库连接失败" | 界面能打开但登录失败，`MyBatisSessionFactory` 抛 `MyBatis 配置加载失败：mybatis-config.xml`——**用户实际遇到的"数据库连接失败"**（与库账号密码无关） | （a）把运行资源镜像到 `webapp/WEB-INF/classes/` 并由 `build.cmd` 每次编译自动同步：IDEA 打包时必定原样复制 Web 根，资源不再依赖增量构建；（b）`MyBatisSessionFactory` 与启动自检区分"配置未进入类路径"与"数据库连不上"两种失败 |
 | 13 | `MyBatisCheck` 用绝对值断言在单量（`== 1` / `== 0`），`http-e2e.ps1` 把资料修改用的手机号写死为 `13911110009` | 两个验证脚本都只能跑一次，第二次必然失败（表现为"在单量不是 1"、"该手机号已被其他账户使用"），无法重复复验 | `MyBatisCheck` 改为按"派单前在单量"的增量断言；`http-e2e.ps1` 改为按运行时刻生成手机号（与注册手机号分号段）；两个脚本现均可重复执行 |
@@ -111,8 +111,8 @@
 | 全局配置 | `src/main/resources/mybatis-config.xml`：POOLED 数据源（参数来自 `db.*`）、`JDBC` 事务管理器、类型别名、10 个 Mapper 注册 |
 | Dao 实现 | 10 个 `MyBatisXxxDaoImpl`，只做「取 Mapper → 调方法 → 转换返回值」，**不含任何 SQL 字符串** |
 | 会话与事务 | `MyBatisSessionFactory`：SqlSessionFactory 初始化、ThreadLocal 事务会话、`begin/commit/rollback`、连接自检 |
-| 事务接入 | `TxTemplate` 按 `storage.mode` 分派：mybatis → SqlSession 事务；jdbc → Database 事务；memory → 空实现 |
-| 三种实现可切换 | `storage.mode=mybatis`（默认）/ `jdbc`（手写 SQL 对照）/ `memory`（内存库演示） |
+| 事务接入 | `TxTemplate` 按 `storage.mode` 分派：mybatis → SqlSession 事务（同一线程复用同一 SqlSession 与连接）；memory → 空实现 |
+| 两种实现可切换 | `storage.mode=mybatis`（默认/正式部署）/ `memory`（内存库演示与业务自测） |
 | 自检工具 | `dal/MyBatisCapabilityProbe`：报告各 DAO 实际实现类、已注册 Mapper、映射语句数 |
 
 **关键 SQL 的设计要点**：`findByCondition/countByCondition` 用 `<where>+<if>` 动态拼条件 + `LIMIT/OFFSET` 分页；
@@ -127,7 +127,8 @@
 
 ## 七、运行方式收敛（仅保留 Tomcat 部署）
 
-按交付要求，项目已移除一切"仅内置服务器使用"的内容，运行入口只保留 Servlet 组件：
+按交付要求，项目已移除一切"仅内置服务器使用"的内容，运行入口只保留 Servlet 组件；
+并按交付要求移除手写 SQL 的 `dao/jdbc/` 实现（数据访问统一由 MyBatis Mapper 承担）：
 
 | 已删除 | 原因 |
 | --- | --- |
@@ -137,12 +138,15 @@
 | `webapp/init.jsp`、`webapp/forward.jsp` | 登录页改用静态 `webapp/index.html` |
 | `pom.xml` | 不再打 WAR（IDEA Artifact 直接指向 `webapp`） |
 | `build/`、`target/` | 旧编译产物、过时 class 与旧日志（已加入 `.gitignore`） |
+| `src/main/java/.../dao/jdbc/`（13 个文件） | 手写 SQL 的对照实现（`JdbcXxxDaoImpl` + `JdbcTemplate`/`RowMapper`/`Database`）；数据访问层统一由 MyBatis Mapper 承担，`storage.mode` 收敛为 mybatis / memory 两种 |
+| `src/test/java/.../JdbcFlowCheck.java` | 针对该手写 SQL 实现的定点验证，随实现一并移除 |
+| `DaoFactory.isJdbcMode()`、`AppConfig.isJdbcMode()` | 仅服务于已移除的 jdbc 模式；`TxTemplate`、`CampusContextListener` 中的 jdbc 分支同步删除 |
 
 保留内容（Tomcat 运行与验证必需）：
 
 | 保留 | 用途 |
 | --- | --- |
-| `src/main/java`（101 个文件） | Controller / Service / DAO 接口 / **MyBatis Dao** / 手写 SQL Dao / 内存 Dao / 实体 / 工具 |
+| `src/main/java`（100 个文件） | Controller / Service / DAO 接口 / **MyBatis Dao** / 内存 Dao / 实体 / 工具 |
 | `src/servlet-adapter/java`（2 个文件） | `ApiServlet` + `CampusContextListener`，Tomcat 运行入口 |
 | `src/main/java/.../boot/DemoDataLoader.java` | 内存库演示数据，由 `CampusContextListener` 调用 |
 | `src/main/resources/mybatis-config.xml` | MyBatis 全局配置（POOLED 数据源、JDBC 事务、10 个 Mapper 注册） |
@@ -152,10 +156,11 @@
 | `lib/`（4 个 jar） | MyBatis、MySQL 驱动、slf4j（需加入 `WEB-INF/lib`） |
 | `db/schema.sql`、`db/seed.sql` | MySQL 建表与演示数据 |
 | `scripts/build.ps1`、`scripts/http-e2e.ps1` | 编译校验/自测与端到端验证（可选） |
-| `src/test/java`（7 个程序） | 业务自测、**MyBatis 定点验证**与其它定点验证（可选） |
+| `src/test/java`（6 个程序） | 业务自测、**MyBatis 定点验证**与其它定点验证（可选） |
 
-清理后复验：`build.cmd -WithSelfTest` 编译 **115 个源文件**成功、业务自测 **99/99 通过**；
+清理后复验：`build.cmd -WithSelfTest` 编译 **102 个源文件**成功、业务自测 **99/99 通过**；
 Tomcat 11 + MyBatis + MySQL 部署端到端 **97/97 通过**（`build/http-e2e.log`）；
+`MyBatisCheck` 在**只含部署目录的类路径**上 **39/39 通过**（`build/mybatis-check.log`）；
 源码内无对已删除类的残留引用。
 
 ---
@@ -167,11 +172,11 @@ Tomcat 11 + MyBatis + MySQL 部署端到端 **97/97 通过**（`build/http-e2e.l
 | `README.md` | 交付说明（部署、结构、需求对照、数据库、接口、MyBatis 层说明、差异说明、排查表） |
 | `DELIVERY-VERIFICATION.md` | 本报告 |
 | `db/schema.sql`、`db/seed.sql` | 建表脚本（10 张表）与演示数据 |
-| `src/main/java` | 113 个 Java 文件（boot/common/config/domain/dao/mapper/dao-mybatis/dao-jdbc/dao-memory/dal/service/util/web） |
+| `src/main/java` | 100 个 Java 文件（boot/common/config/domain/dao/mapper/dao-mybatis/dao-memory/dal/service/util/web） |
 | `src/main/resources/mapper/*.xml` | 10 个 MyBatis Mapper XML（99 条映射语句） |
 | `src/main/resources/mybatis-config.xml` | MyBatis 全局配置 |
 | `src/servlet-adapter/java` | Tomcat 运行入口（ApiServlet、CampusContextListener） |
-| `src/test/java` | 7 个验证程序（含 MyBatisCheck） |
+| `src/test/java` | 6 个验证程序（含 MyBatisCheck） |
 | `lib/` | MyBatis 3.5.16、MySQL 驱动、slf4j（部署时加入 `WEB-INF/lib`） |
 | `webapp/` | Web 根：17 个页面 + 15 个脚本 + 样式 + `WEB-INF/web.xml` + `WEB-INF/classes` 下 12 个运行资源镜像（MyBatis 配置与 mapper） |
 | `scripts/build.ps1`、`scripts/http-e2e.ps1` | 编译校验/自测脚本、端到端验证脚本 |

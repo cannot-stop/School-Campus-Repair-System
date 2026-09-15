@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.campus.repair.dao.DaoFactory;
-import com.campus.repair.dao.jdbc.JdbcTemplate;
 import com.campus.repair.dao.mybatis.MyBatisSessionFactory;
 import com.campus.repair.dal.MyBatisCapabilityProbe;
 import com.campus.repair.domain.Evaluation;
@@ -80,6 +79,13 @@ public class MyBatisCheck {
         check("t_base_data 基础数据查询可用（楼栋 " + buildings.size() + " 个）", buildings.size() > 0);
         Worker waterWorker = DaoFactory.workerDao().findBySkill("水电").get(0);
         check("技能标签模糊查询可用（" + waterWorker.getName() + "）", waterWorker.getWorkerId() != null);
+        // 派单要求维修工在线，而"在线状态"会被其它验证脚本改动（如端到端脚本的在线状态用例），
+        // 为保证本程序可重复运行，这里先把选中的维修工置为在线（同时也是对 updateStatus 的一次验证）。
+        if (!waterWorker.isOnline()) {
+            DaoFactory.workerDao().updateStatus(waterWorker.getWorkerId(), Integer.valueOf(1));
+            waterWorker = DaoFactory.workerDao().findById(waterWorker.getWorkerId());
+            out.println("  [提示] " + waterWorker.getName() + " 原为离线状态，已置为在线以便继续验证派单");
+        }
 
         // ---------------------------------------------------------- 3) 报修闭环
         out.println();
@@ -197,7 +203,7 @@ public class MyBatisCheck {
         check("超库存登记被拒绝且库存未变（" + stockNow + " → " + stockAfterFail + "）",
                 rejected && stockAfterFail == stockNow);
 
-        Object updateTime = JdbcTemplate.queryScalar("SELECT update_time FROM t_repair_order WHERE order_id = ?",
+        Object updateTime = queryScalarByJdbc("SELECT update_time FROM t_repair_order WHERE order_id = ?",
                 order.getOrderId());
         check("update_time 由 SQL 维护（" + updateTime + "）", updateTime != null);
 
@@ -211,6 +217,28 @@ public class MyBatisCheck {
         }
         out.close();
         System.exit(failed > 0 ? 1 : 0);
+    }
+
+    /**
+     * 直接用 JDBC 读取一个标量值（绕开 DAO 层），用于核对 SQL 侧维护的字段。
+     *
+     * <p>该探针自带连接，不依赖任何 DAO 实现，因此可以独立验证"MyBatis 写入的结果确实落到了数据库里"。</p>
+     */
+    private static Object queryScalarByJdbc(String sql, Object... params) throws Exception {
+        java.sql.Connection conn = java.sql.DriverManager.getConnection(
+                com.campus.repair.config.AppConfig.get("db.url", ""),
+                com.campus.repair.config.AppConfig.get("db.username", "root"),
+                com.campus.repair.config.AppConfig.get("db.password", ""));
+        try (java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (int i = 0; i < params.length; i++) {
+                ps.setObject(i + 1, params[i]);
+            }
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getObject(1) : null;
+            }
+        } finally {
+            conn.close();
+        }
     }
 
     private static void check(String name, boolean condition) {

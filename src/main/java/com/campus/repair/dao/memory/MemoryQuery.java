@@ -20,7 +20,7 @@ public final class MemoryQuery {
     private MemoryQuery() {
     }
 
-    /** 按条件过滤报修单（与 JdbcRepairOrderDaoImpl 的 WHERE 语义一致） */
+    /** 按条件过滤报修单（与 RepairOrderMapper 的 WHERE 条件语义一致） */
     public static List<RepairOrder> filterOrders(List<RepairOrder> source, OrderQuery query) {
         List<RepairOrder> result = new ArrayList<RepairOrder>();
         if (source == null) {

@@ -15,6 +15,7 @@ public class ConfigProbe {
                 + (AppConfig.get("db.password", "").isEmpty() ? "(空)" : "已设置"));
         DaoFactory.init();
         System.out.println("DaoFactory mode                = " + DaoFactory.mode());
-        System.out.println("isJdbcMode                     = " + DaoFactory.isJdbcMode());
+        System.out.println("isMyBatisMode                  = " + DaoFactory.isMyBatisMode());
+        System.out.println("isMemoryMode                   = " + DaoFactory.isMemoryMode());
     }
 }

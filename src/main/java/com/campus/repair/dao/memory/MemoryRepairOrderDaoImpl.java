@@ -17,7 +17,7 @@ import com.campus.repair.domain.Worker;
 /**
  * 报修单数据访问内存实现。
  *
- * <p>查询带出报修人、当前任务、维修人员与评价信息，语义与 JdbcRepairOrderDaoImpl 的 JOIN 查询一致。</p>
+ * <p>查询带出报修人、当前任务、维修人员与评价信息，语义与 RepairOrderMapper 的关联查询一致。</p>
  */
 public class MemoryRepairOrderDaoImpl implements RepairOrderDao {
 
